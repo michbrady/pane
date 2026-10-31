@@ -358,7 +358,7 @@ As the user, I see the item count, the selection count and size.
 Depends: S-002
 Acceptance:
 - [snap] "12 items", "3 items selected 4.1 MB".
-Status: todo
+Status: done
 
 ## M5 System
 

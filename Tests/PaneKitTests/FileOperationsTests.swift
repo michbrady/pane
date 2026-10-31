@@ -282,6 +282,16 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(FolderSorter.sorted([a, b], key: .created, ascending: true, foldersFirst: true).map(\.name) == ["b", "a"])
 }
 
+@Test func statusBarSaysItemsAndSelection() {
+    #expect(SelectionSummary.text(itemCount: 12, selected: []) == "12 items")
+    #expect(SelectionSummary.text(itemCount: 1, selected: []) == "1 item")
+    #expect(SelectionSummary.text(itemCount: 0, selected: []) == "0 items")
+    let three = [item("a", size: 1_000_000), item("b", size: 2_000_000), item("c", size: 1_100_000)]
+    #expect(SelectionSummary.text(itemCount: 12, selected: three) == "3 items selected  4.1 MB")
+    #expect(SelectionSummary.text(itemCount: 12, selected: [three[0]]) == "1 item selected  1 MB")
+    #expect(SelectionSummary.text(itemCount: 5, selected: [item("Folder", folder: true)]) == "1 item selected")
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }
