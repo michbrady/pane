@@ -327,7 +327,8 @@ Depends: S-002
 Acceptance:
 - [snap] The pane sits on the right with a drag edge. It shows images, PDFs, text, and a name, size, date summary for the rest.
 - [self] Cmd+Shift+P toggles the pane. Option+letter shortcuts are not used.
-Status: todo
+Note: snapshot pages `preview`, `preview-image`, and `preview-pdf` show text, image, and PDF. Anything else, and a file that cannot be read, shows its icon. Dragging the pane's edge to resize is the system inspector's own [manual]. The pane is a custom summary, not Quick Look, so Space still opens Quick Look (S-032).
+Status: done
 
 ### S-032 Quick Look with Space
 As the user, I press Space on a file to preview it in Quick Look.

@@ -12,7 +12,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -87,6 +87,15 @@ enum Snapshot {
                     model.tab.selection = Set(model.tab.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
                     try? await Task.sleep(for: .milliseconds(150))
                     model.showProperties()
+                }
+            case .preview, .previewImage, .previewPDF:
+                let folder = self == .previewImage ? "Pictures" : "Documents"
+                let name = self == .previewImage ? "Beach.jpg" : self == .previewPDF ? "Trip itinerary.pdf" : "Notes.txt"
+                model.tab.go(to: home.appending(path: folder, directoryHint: .isDirectory))
+                model.view.showPreview = true
+                Task {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    model.tab.selection = Set(model.tab.items.filter { $0.name == name }.map(\.url))
                 }
             case .list:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))

@@ -351,6 +351,27 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(TagEditor.standard.count == 7)
 }
 
+@Test func previewKindsFollowTheFileType() {
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/photo.JPG")) == .image)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/a.png")) == .image)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/doc.pdf")) == .pdf)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/notes.txt")) == .text)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/readme.md")) == .text)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/main.swift")) == .text)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/data.json")) == .text)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/archive.zip")) == .other)
+    #expect(PreviewKind.kind(for: URL(fileURLWithPath: "/x/noextension")) == .other)
+}
+
+@Test func textPreviewStopsAtTheLimit() throws {
+    let file = FileManager.default.temporaryDirectory.appending(path: "pane-text-\(UUID().uuidString).txt")
+    try Data(String(repeating: "abc ", count: 5000).utf8).write(to: file)
+    defer { try? FileManager.default.removeItem(at: file) }
+    #expect(PreviewKind.textPreview(of: file, limit: 100)?.count == 100)
+    #expect(PreviewKind.textPreview(of: file)?.count == 20_000)
+    #expect(PreviewKind.textPreview(of: file.appending(path: "missing")) == nil)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

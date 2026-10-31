@@ -14,6 +14,10 @@ struct ContentView: View {
         } detail: {
             FolderPage()
         }
+        .inspector(isPresented: Binding(get: { model.view.showPreview }, set: { model.view.showPreview = $0 })) {
+            PreviewPane(model: model)
+                .inspectorColumnWidth(min: Layout.previewMin, ideal: Layout.previewIdeal, max: Layout.previewMax)
+        }
         .navigationTitle(model.tab.currentName)
         .noInitialFocus()
         .onChange(of: undoManager, initial: true) { _, manager in model.actions.windowUndoManager = manager }
@@ -81,12 +85,14 @@ struct FolderPage: View {
                 .accessibilityHidden(true)
         }
         .searchable(text: $search, prompt: "Search")
-        .toolbar { CommandBar() }
+        .toolbar { CommandBar(view: model.view) }
     }
 }
 
 /// Explorer's Command bar as the window toolbar. Items dim until their stories land.
 private struct CommandBar: ToolbarContent {
+    let view: ViewSettings
+
     var body: some ToolbarContent {
         ToolbarItemGroup {
             Menu("New", systemImage: "plus") {
@@ -119,6 +125,11 @@ private struct CommandBar: ToolbarContent {
             Menu("View", systemImage: "list.bullet") {}
                 .help("Choose how items are shown")
                 .disabled(true)
+        }
+        ToolbarSpacer(.fixed)
+        ToolbarItem {
+            Button("Preview Pane", systemImage: "sidebar.trailing") { view.showPreview.toggle() }
+                .help("Show or hide the preview pane (⇧⌘P)")
         }
     }
 }

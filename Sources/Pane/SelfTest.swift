@@ -418,6 +418,15 @@ enum SelfTest {
             model.tab.moveSelection(by: 1)
             check("an arrow key with nothing selected picks the first item", model.tab.selectedItems.first?.name == model.tab.items.first?.name)
 
+            // S-031 Show a preview pane
+            check("the preview pane starts hidden", model.view.showPreview == false)
+            model.view.showPreview = true
+            check("the preview pane setting is saved", ViewSettings().showPreview == true)
+            model.view.showPreview = false
+            check("Notes.txt previews as text and a photo as an image",
+                  PreviewKind.kind(for: URL(fileURLWithPath: "/x/Notes.txt")) == .text && PreviewKind.kind(for: URL(fileURLWithPath: "/x/Beach.jpg")) == .image)
+            model.view.reset()
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

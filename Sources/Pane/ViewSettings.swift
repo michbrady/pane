@@ -28,6 +28,8 @@ enum ViewMode: String, CaseIterable {
 @Observable
 final class ViewSettings {
     var mode: ViewMode { didSet { changed() } }
+    /// The pane on the right that previews the selected file.
+    var showPreview: Bool { didSet { changed() } }
     var sortKey: SortKey { didSet { changed() } }
     var ascending: Bool { didSet { changed() } }
     var foldersFirst: Bool { didSet { changed() } }
@@ -45,6 +47,7 @@ final class ViewSettings {
     init(defaults: UserDefaults = Prefs.defaults) {
         self.defaults = defaults
         columnData = defaults.dictionary(forKey: "view.columns") as? [String: Data] ?? [:]
+        showPreview = defaults.object(forKey: "view.showPreview") as? Bool ?? false
         mode = ViewMode(rawValue: defaults.string(forKey: "view.mode") ?? "") ?? .details
         sortKey = SortKey(rawValue: defaults.string(forKey: "view.sortKey") ?? "") ?? .name
         ascending = defaults.object(forKey: "view.ascending") as? Bool ?? true
@@ -79,6 +82,7 @@ final class ViewSettings {
     }
 
     func reset() {
+        showPreview = false
         columnData = [:]
         mode = .details
         sortKey = .name
@@ -89,6 +93,7 @@ final class ViewSettings {
     }
 
     private func changed() {
+        defaults.set(showPreview, forKey: "view.showPreview")
         defaults.set(mode.rawValue, forKey: "view.mode")
         defaults.set(sortKey.rawValue, forKey: "view.sortKey")
         defaults.set(ascending, forKey: "view.ascending")

@@ -36,3 +36,9 @@ Symptom: the app crashed with "No Observable object of type AppModel found" as s
 Cause: new views read the model from the SwiftUI environment, but Table cells and context menus are hosted outside it.
 Fix: `NameCell`, `RenameField`, and `ItemMenu` take the model as a plain property.
 Rule: a view that lives in a Table column or a menu gets its model passed in. Use `@Environment(AppModel.self)` only for views in the normal view tree.
+
+## The preview spun forever on an image that would not load (S-031)
+Symptom: selecting a damaged or fake image showed a spinner in the preview pane that never stopped.
+Cause: the pane showed a spinner while the image was nil, and nil also meant "loading finished and failed".
+Fix: a `failed` flag, set when loading ends with nothing, shows the file's icon instead.
+Rule: a loading state needs an end state for failure. Never use "no value yet" to mean both "loading" and "gave up".

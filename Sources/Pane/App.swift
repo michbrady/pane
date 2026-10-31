@@ -66,6 +66,8 @@ struct PaneApp: App {
                         .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [.control, .command])
                 }
                 Divider()
+                Toggle("Show Preview Pane", isOn: Binding(get: { model.view.showPreview }, set: { model.view.showPreview = $0 }))
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
                 Toggle("Show Hidden Items", isOn: Binding(get: { model.view.showHidden }, set: { model.view.showHidden = $0 }))
                     .keyboardShortcut(".", modifiers: [.command, .shift])
                 Toggle("Show File Extensions", isOn: Binding(get: { model.view.showExtensions }, set: { model.view.showExtensions = $0 }))
