@@ -29,9 +29,9 @@ struct PaneApp: App {
             SidebarCommands()
             ToolbarCommands()
             CommandGroup(replacing: .newItem) {
-                Button("Open") { model.openSelection() }
+                Button("Open") { model.tab.openSelection() }
                     .keyboardShortcut(.downArrow, modifiers: .command)
-                    .disabled(model.selection.isEmpty)
+                    .disabled(model.tab.selection.isEmpty)
                 Button("New Folder") { model.newFolder() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Rename") { model.beginRename() }
@@ -40,10 +40,10 @@ struct PaneApp: App {
                 Divider()
                 Button("Move to Trash") { model.trashSelection() }
                     .keyboardShortcut(.delete, modifiers: .command)
-                    .disabled(model.selection.isEmpty)
+                    .disabled(model.tab.selection.isEmpty)
                 Button("Delete Immediately…") { model.askDeleteImmediately() }
                     .keyboardShortcut(.delete, modifiers: .shift)
-                    .disabled(model.selection.isEmpty)
+                    .disabled(model.tab.selection.isEmpty)
             }
             CommandGroup(replacing: .pasteboard) {
                 Button("Cut") { model.cutSelection() }
@@ -56,15 +56,15 @@ struct PaneApp: App {
                     .keyboardShortcut("v")
             }
             CommandMenu("Go") {
-                Button("Back") { model.goBack() }
+                Button("Back") { model.tab.goBack() }
                     .keyboardShortcut("[")
-                    .disabled(!model.canGoBack)
-                Button("Forward") { model.goForward() }
+                    .disabled(!model.tab.canGoBack)
+                Button("Forward") { model.tab.goForward() }
                     .keyboardShortcut("]")
-                    .disabled(!model.canGoForward)
-                Button("Enclosing Folder") { model.goUp() }
+                    .disabled(!model.tab.canGoForward)
+                Button("Enclosing Folder") { model.tab.goUp() }
                     .keyboardShortcut(.upArrow, modifiers: .command)
-                    .disabled(!model.canGoUp)
+                    .disabled(!model.tab.canGoUp)
                 Divider()
                 Button("Go to Address…") { model.beginEditingAddress() }
                     .keyboardShortcut("l")

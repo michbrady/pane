@@ -6,8 +6,8 @@ struct DetailsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        @Bindable var model = model
-        Table(model.items, selection: $model.selection) {
+        @Bindable var tab = model.tab
+        Table(tab.items, selection: $tab.selection) {
             TableColumn("Name") { item in
                 HStack(spacing: Space.sm) {
                     Image(nsImage: IconCache.icon(for: item.url, isFolder: item.isFolder))
@@ -47,29 +47,29 @@ struct DetailsView: View {
             return urls
         }
         // Dropping on empty space drops into the folder being shown.
-        .acceptsFileDrops(into: model.currentFolder, model: model)
+        .acceptsFileDrops(into: model.tab.currentFolder, model: model)
         .contextMenu(forSelectionType: URL.self) { urls in
             if !urls.isEmpty {
-                Button("Open") { model.open(Array(urls)) }
+                Button("Open") { model.tab.open(Array(urls)) }
                 if urls.count == 1 {
                     Button("Rename") { model.beginRename() }
                 }
             }
         } primaryAction: { urls in
-            model.open(Array(urls))
+            model.tab.open(Array(urls))
         }
         .onKeyPress(.return) {
-            guard !model.selection.isEmpty else { return .ignored }
-            model.openSelection()
+            guard !model.tab.selection.isEmpty else { return .ignored }
+            model.tab.openSelection()
             return .handled
         }
         .onKeyPress(.delete) {
-            guard !model.selection.isEmpty else { return .ignored }
+            guard !model.tab.selection.isEmpty else { return .ignored }
             model.trashSelection()
             return .handled
         }
         .onKeyPress(.deleteForward) {
-            guard !model.selection.isEmpty else { return .ignored }
+            guard !model.tab.selection.isEmpty else { return .ignored }
             model.trashSelection()
             return .handled
         }
@@ -79,12 +79,12 @@ struct DetailsView: View {
         }
         .alternatingRowBackgrounds(.disabled)
         .overlay { stateOverlay }
-        .animation(nil, value: model.items)
+        .animation(nil, value: model.tab.items)
     }
 
     @ViewBuilder
     private var stateOverlay: some View {
-        if let error = model.loadError {
+        if let error = model.tab.loadError {
             ContentUnavailableView {
                 Label(error, systemImage: "lock.fill")
             } description: {
@@ -92,9 +92,9 @@ struct DetailsView: View {
             } actions: {
                 Button("Open Settings") { Permissions.openFullDiskAccess() }
             }
-        } else if model.isSlow {
+        } else if model.tab.isSlow {
             ProgressView("Loading…")
-        } else if model.items.isEmpty, !model.isLoading {
+        } else if model.tab.items.isEmpty, !model.tab.isLoading {
             ContentUnavailableView("This folder is empty", systemImage: "folder")
         }
     }

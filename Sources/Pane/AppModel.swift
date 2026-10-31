@@ -20,14 +20,7 @@ struct PendingConflict {
 /// App-wide state that menus, toolbars, and views share.
 @Observable
 final class AppModel {
-    private(set) var history: NavigationHistory
-    private(set) var items: [FolderItem] = []
-    var selection: Set<URL> = []
-    private(set) var loadError: String?
-    private(set) var isLoading = false
-    /// True once a load has taken more than half a second.
-    private(set) var isSlow = false
-    var showHidden = false
+    let tab: FolderTab
 
     // Navigation pane
     let quickRoots: [NavNode]
@@ -50,7 +43,6 @@ final class AppModel {
     var settingsTab: SettingsTab = SettingsTab(rawValue: UserDefaults.standard.string(forKey: "settings.tab") ?? "") ?? .general {
         didSet { if !Locations.isOverridden { UserDefaults.standard.set(settingsTab.rawValue, forKey: "settings.tab") } }
     }
-
     // File operations
     private(set) var clipboard = Clipboard()
     private let operations = FileOperations(LocalFileSystem(
@@ -80,17 +72,6 @@ final class AppModel {
     private let fallbackUndoManager = UndoManager()
     var undoManager: UndoManager { windowUndoManager ?? fallbackUndoManager }
 
-    private let watcher = FolderWatcher()
-    private var generation = 0
-    private var reloadTask: Task<Void, Never>?
-
-    var currentFolder: URL { history.current }
-    var currentName: String { Locations.displayName(for: currentFolder) }
-    var canGoBack: Bool { history.canGoBack }
-    var canGoForward: Bool { history.canGoForward }
-    var canGoUp: Bool { Breadcrumbs.parent(of: currentFolder) != nil }
-    var selectedItems: [FolderItem] { items.filter { selection.contains($0.url) } }
-
     init() {
         let defaults = Prefs.defaults
         quickRoots = Locations.quickAccess.map { NavNode(url: $0, prefix: "quick:") }
@@ -109,102 +90,32 @@ final class AppModel {
         } else if !FileManager.default.fileExists(atPath: start.path) {
             start = Locations.home
         }
-        history = NavigationHistory(start: Self.canonical(start))
-        afterNavigation()
-    }
-
-    // MARK: Navigating
-
-    /// One spelling per folder, so the same folder reached two ways is equal.
-    static func canonical(_ url: URL) -> URL {
-        URL(fileURLWithPath: url.standardizedFileURL.path)
-    }
-
-    func go(to url: URL) {
-        let url = Self.canonical(url)
-        guard url != currentFolder else { return }
-        history.visit(url)
-        afterNavigation()
-    }
-
-    func goBack() {
-        guard history.goBack() != nil else { return }
-        afterNavigation()
-    }
-
-    func goForward() {
-        guard history.goForward() != nil else { return }
-        afterNavigation()
-    }
-
-    func goUp() {
-        guard let parent = Breadcrumbs.parent(of: currentFolder) else { return }
-        go(to: parent)
-    }
-
-    /// Return, Command-Down, or a double-click: a folder shows its contents, a file opens.
-    func open(_ urls: [URL]) {
-        let paths = Set(urls.map { $0.standardizedFileURL.path })
-        let chosen = items.filter { paths.contains($0.url.standardizedFileURL.path) }
-        if chosen.count == 1, let only = chosen.first, only.isFolder {
-            go(to: only.url)
-            return
+        tab = FolderTab(start: start)
+        tab.didNavigate = { [unowned self] in
+            isEditingAddress = false
+            syncTree()
+            Prefs.defaults.set(tab.currentFolder.path, forKey: "pane.folder")
         }
-        for item in chosen where !item.isFolder { openFile(item.url) }
-    }
-
-    func openSelection() {
-        open(Array(selection))
-    }
-
-    private func openFile(_ url: URL) {
-        guard NSWorkspace.shared.urlForApplication(toOpen: url) != nil else {
-            askForApp(for: url)
-            return
-        }
-        NSWorkspace.shared.open(url)
-    }
-
-    private func askForApp(for url: URL) {
-        let alert = NSAlert()
-        alert.messageText = "No app can open this file."
-        alert.informativeText = "\(url.lastPathComponent) has no app to open it."
-        alert.addButton(withTitle: "Choose App…")
-        alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(filePath: "/Applications")
-        guard panel.runModal() == .OK, let app = panel.url else { return }
-        NSWorkspace.shared.open([url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
-    }
-
-    private func afterNavigation() {
-        selection = []
-        isEditingAddress = false
-        syncTree()
-        Prefs.defaults.set(currentFolder.path, forKey: "pane.folder")
-        watcher.watch(currentFolder) { [weak self] in self?.scheduleReload() }
-        reload()
+        tab.begin()
     }
 
     // MARK: Copy, cut, paste
 
     private var editingText: NSText? { NSApp.keyWindow?.firstResponder as? NSText }
-    var canCopy: Bool { !selection.isEmpty || isEditingAddress }
+    var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
     func isCut(_ url: URL) -> Bool { clipboard.isCut(url) }
 
     func copySelection() {
         if let text = editingText { text.copy(nil); return }
-        guard !selection.isEmpty else { return }
-        clipboard.write(Array(selection), cut: false)
+        guard !tab.selection.isEmpty else { return }
+        clipboard.write(Array(tab.selection), cut: false)
     }
 
     func cutSelection() {
         if let text = editingText { text.cut(nil); return }
-        guard !selection.isEmpty else { return }
-        clipboard.write(Array(selection), cut: true)
+        guard !tab.selection.isEmpty else { return }
+        clipboard.write(Array(tab.selection), cut: true)
     }
 
     func clearCut() {
@@ -215,7 +126,7 @@ final class AppModel {
         if let text = editingText { text.paste(nil); return }
         let sources = clipboard.urls
         guard !sources.isEmpty, operationTask == nil else { return }
-        startPaste(sources, into: currentFolder, mode: clipboard.isCutActive ? .move : .copy, clearsCut: clipboard.isCutActive)
+        startPaste(sources, into: tab.currentFolder, mode: clipboard.isCutActive ? .move : .copy, clearsCut: clipboard.isCutActive)
     }
 
     private func startPaste(_ sources: [URL], into folder: URL, mode: PasteMode, clearsCut: Bool) {
@@ -232,7 +143,7 @@ final class AppModel {
 
     // MARK: Drag and drop
 
-    /// The items being dragged out of this window, so a hover can tell move from copy.
+    /// The tab.items being dragged out of this window, so a hover can tell move from copy.
     private(set) var dragSources: [URL] = []
 
     func dragStarted(_ urls: [URL]) {
@@ -279,7 +190,7 @@ final class AppModel {
             operationTask = nil
             report(result)
             remember(result.record)
-            reload()
+            tab.reload()
         }
     }
 
@@ -312,22 +223,22 @@ final class AppModel {
     // MARK: Trash and delete
 
     func trashSelection() {
-        let urls = Array(selection)
+        let urls = Array(tab.selection)
         guard !urls.isEmpty, operationTask == nil, editingText == nil else { return }
-        pendingSelection = items.firstIndex { selection.contains($0.url) }.map { ($0, Set(urls)) }
+        tab.pendingSelection = tab.items.firstIndex { tab.selection.contains($0.url) }.map { ($0, Set(urls)) }
         run(title: "Moving to Trash") { [self] in await operations.trash(urls) } finished: { $0 }
     }
 
     /// Shift-Delete asks first, because this cannot be undone.
     func askDeleteImmediately() {
-        guard !selection.isEmpty, editingText == nil else { return }
-        pendingDelete = Array(selection)
+        guard !tab.selection.isEmpty, editingText == nil else { return }
+        pendingDelete = Array(tab.selection)
     }
 
     func deleteImmediately() {
         guard let urls = pendingDelete, operationTask == nil else { return }
         pendingDelete = nil
-        pendingSelection = items.firstIndex { urls.contains($0.url) }.map { ($0, Set(urls)) }
+        tab.pendingSelection = tab.items.firstIndex { urls.contains($0.url) }.map { ($0, Set(urls)) }
         run(title: "Deleting") { [self] in
             OperationResult(record: OperationRecord(name: "Delete Immediately", steps: []),
                             failures: await operations.deleteImmediately(urls))
@@ -348,10 +259,10 @@ final class AppModel {
 
     // MARK: Rename and new folder
 
-    var canRename: Bool { selection.count == 1 && editingText == nil }
+    var canRename: Bool { tab.selection.count == 1 && editingText == nil }
 
     func beginRename() {
-        guard canRename, let item = selectedItems.first else { return }
+        guard canRename, let item = tab.selectedItems.first else { return }
         renameText = item.name
         renameError = nil
         renamingURL = item.url
@@ -364,7 +275,7 @@ final class AppModel {
 
     /// Return commits. Clicking away commits too, but never shows an error: it just stops.
     func commitRename(fromBlur: Bool = false) {
-        guard let url = renamingURL, let item = items.first(where: { $0.url == url }) else { return }
+        guard let url = renamingURL, let item = tab.items.first(where: { $0.url == url }) else { return }
         if renameText == item.name { cancelRename(); return }
         let text = renameText
         Task {
@@ -375,7 +286,7 @@ final class AppModel {
                 remember(record)
                 let renamed = url.deletingLastPathComponent().appending(path: text.trimmingCharacters(in: .whitespacesAndNewlines))
                 selectAfterReload(path: renamed.standardizedFileURL.path)
-                reload()
+                tab.reload()
             } catch let error as FileOperations.RenameError {
                 if fromBlur { cancelRename(); return }
                 switch error {
@@ -392,17 +303,17 @@ final class AppModel {
     /// Cmd-Shift-N: make "New folder" and start naming it.
     func newFolder() {
         guard editingText == nil, operationTask == nil else { return }
-        let folder = currentFolder
+        let folder = tab.currentFolder
         Task {
             do {
                 let (url, record) = try await operations.makeFolder(in: folder)
                 remember(record)
-                afterReload = { [self] in
-                    guard let item = items.first(where: { $0.url.standardizedFileURL.path == url.standardizedFileURL.path }) else { return }
-                    selection = [item.url]
+                tab.afterReload = { [self] in
+                    guard let item = tab.items.first(where: { $0.url.standardizedFileURL.path == url.standardizedFileURL.path }) else { return }
+                    tab.selection = [item.url]
                     beginRename()
                 }
-                reload()
+                tab.reload()
             } catch {
                 alertMessage = "Unable to make a folder here. \(error.localizedDescription)"
             }
@@ -410,8 +321,8 @@ final class AppModel {
     }
 
     private func selectAfterReload(path: String) {
-        afterReload = { [self] in
-            if let item = items.first(where: { $0.url.standardizedFileURL.path == path }) { selection = [item.url] }
+        tab.afterReload = { [self] in
+            if let item = tab.items.first(where: { $0.url.standardizedFileURL.path == path }) { tab.selection = [item.url] }
         }
     }
 
@@ -439,7 +350,7 @@ final class AppModel {
         undoManager.setActionName(box.record.name)
         Task {
             do { try await operations.undo(box.record) } catch { alertMessage = "Unable to undo. \(error.localizedDescription)" }
-            reload()
+            tab.reload()
         }
     }
 
@@ -448,7 +359,7 @@ final class AppModel {
         undoManager.setActionName(box.record.name)
         Task {
             do { box.record = try await operations.redo(box.record) } catch { alertMessage = "Unable to redo. \(error.localizedDescription)" }
-            reload()
+            tab.reload()
         }
     }
 
@@ -462,71 +373,11 @@ final class AppModel {
             alertMessage = "Unable to complete \(first.url.lastPathComponent). \(first.message)\(more)"
         }
     }
-
-    // MARK: Listing
-
-    func reload() {
-        let folder = currentFolder
-        let hidden = showHidden
-        generation += 1
-        let mine = generation
-        isLoading = true
-        isSlow = false
-        Task {
-            try? await Task.sleep(for: .seconds(0.5))
-            if mine == generation, isLoading { isSlow = true }
-        }
-        Task {
-            let result = await Task.detached { Result { try FolderLister.list(folder, showHidden: hidden) } }.value
-            guard mine == generation else { return }
-            isLoading = false
-            isSlow = false
-            switch result {
-            case .success(let listed):
-                items = listed
-                loadError = nil
-                let still = Set(listed.map(\.url))
-                selection = selection.intersection(still)
-                // After Trash or delete, select the item that moved up. Wait for a listing
-                // where the removed items are gone: the folder watcher can reload early.
-                if let pending = pendingSelection, !listed.isEmpty,
-                   !listed.contains(where: { pending.removed.contains($0.url) }) {
-                    pendingSelection = nil
-                    // The Table drops its selection while it swaps rows, so choose after it settles.
-                    let next = listed[min(pending.index, listed.count - 1)].url
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(80))
-                        if currentFolder == folder { selection = [next] }
-                    }
-                }
-                if let action = afterReload {
-                    afterReload = nil
-                    // The Table drops its selection while it swaps rows, so act after it settles.
-                    Task {
-                        try? await Task.sleep(for: .milliseconds(80))
-                        if currentFolder == folder { action() }
-                    }
-                }
-            case .failure:
-                items = []
-                loadError = "Unable to read this folder."
-            }
-        }
-    }
-
-    private func scheduleReload() {
-        reloadTask?.cancel()
-        reloadTask = Task {
-            try? await Task.sleep(for: .seconds(0.2))
-            if !Task.isCancelled { reload() }
-        }
-    }
-
     // MARK: Navigation pane
 
     /// Expands the folders above the current one and selects its row.
     private func syncTree() {
-        let url = currentFolder
+        let url = tab.currentFolder
         let pinned = quickRoots.contains { $0.url.path == url.path }
         let homePath = Locations.home.path
         let underHome = url.path == homePath || url.path.hasPrefix(homePath + "/")
@@ -549,7 +400,7 @@ final class AppModel {
 
     func beginEditingAddress() {
         let home = Locations.home.path
-        let path = currentFolder.path
+        let path = tab.currentFolder.path
         addressText = path == home ? "~" : (path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path)
         addressFailedText = nil
         isEditingAddress = true
@@ -561,11 +412,11 @@ final class AppModel {
     }
 
     func commitAddress() {
-        switch PathResolver.resolve(addressText, home: Locations.home, base: currentFolder) {
+        switch PathResolver.resolve(addressText, home: Locations.home, base: tab.currentFolder) {
         case .success(let url):
             isEditingAddress = false
             addressFailedText = nil
-            go(to: url)
+            tab.go(to: url)
         case .failure(.empty):
             cancelEditingAddress()
         case .failure:

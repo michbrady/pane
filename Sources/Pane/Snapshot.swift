@@ -23,49 +23,49 @@ enum Snapshot {
             model.cancelRename()
             switch self {
             case .window:
-                model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
             case .tree:
-                model.go(to: home.appending(path: "Documents/Work", directoryHint: .isDirectory))
+                model.tab.go(to: home.appending(path: "Documents/Work", directoryHint: .isDirectory))
             case .addressEdit:
-                model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.beginEditingAddress()
             case .addressError:
                 model.beginEditingAddress()
                 model.addressText = "~/Nope"
                 model.commitAddress()
             case .emptyFolder:
-                model.go(to: home.appending(path: "Empty", directoryHint: .isDirectory))
+                model.tab.go(to: home.appending(path: "Empty", directoryHint: .isDirectory))
             case .cut:
-                model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
-                model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "Budget 2026.xlsx")]
+                model.tab.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "Budget 2026.xlsx")]
                 model.cutSelection()
                 Task {
                     try? await Task.sleep(for: .milliseconds(500))
-                    model.selection = Set(model.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
+                    model.tab.selection = Set(model.tab.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
                 }
             case .conflict:
                 let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
-                model.go(to: docs.appending(path: "Work", directoryHint: .isDirectory))
+                model.tab.go(to: docs.appending(path: "Work", directoryHint: .isDirectory))
                 model.showConflictForSnapshot(incoming: docs.appending(path: "Notes.txt"),
                                               existing: docs.appending(path: "Read me first.md"))
             case .deleteConfirm:
                 let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
-                model.go(to: docs)
-                model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
+                model.tab.go(to: docs)
+                model.tab.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
                 model.askDeleteImmediately()
             case .rename:
                 let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
-                model.go(to: docs)
+                model.tab.go(to: docs)
                 // Wait for the listing, then choose and start naming, as a person pressing F2 would.
                 Task {
                     try? await Task.sleep(for: .milliseconds(250))
-                    model.selection = Set(model.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
+                    model.tab.selection = Set(model.tab.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
                     try? await Task.sleep(for: .milliseconds(200))
                     model.beginRename()
                 }
             case .progress:
-                model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.showProgressForSnapshot()
             }
         }

@@ -32,30 +32,30 @@ enum SelfTest {
             try? Data("x".utf8).write(to: docs.appending(path: "file10.txt"))
             try? Data("x".utf8).write(to: docs.appending(path: "file2.txt"))
 
-            model.go(to: docs)
+            model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.5))
-            check("a folder lists its items", model.items.count >= 4, "\(model.items.count) items")
-            check("folders come first", model.items.first?.isFolder == true)
-            let names = model.items.map(\.name)
+            check("a folder lists its items", model.tab.items.count >= 4, "\(model.tab.items.count) items")
+            check("folders come first", model.tab.items.first?.isFolder == true)
+            let names = model.tab.items.map(\.name)
             check("names sort naturally", (names.firstIndex(of: "file2.txt") ?? 0) < (names.firstIndex(of: "file10.txt") ?? 0))
 
-            model.open([work])
+            model.tab.open([work])
             try? await Task.sleep(for: .seconds(0.3))
-            check("open on a folder shows its contents", model.currentFolder.path == work.standardizedFileURL.path)
-            check("Back is available", model.canGoBack)
-            model.goUp()
-            check("Go up shows the parent", model.currentFolder.path == docs.standardizedFileURL.path)
-            model.goBack()
-            check("Go back returns to the last folder", model.currentFolder.path == work.standardizedFileURL.path)
-            model.goForward()
-            check("Go forward returns", model.currentFolder.path == docs.standardizedFileURL.path)
+            check("open on a folder shows its contents", model.tab.currentFolder.path == work.standardizedFileURL.path)
+            check("Back is available", model.tab.canGoBack)
+            model.tab.goUp()
+            check("Go up shows the parent", model.tab.currentFolder.path == docs.standardizedFileURL.path)
+            model.tab.goBack()
+            check("Go back returns to the last folder", model.tab.currentFolder.path == work.standardizedFileURL.path)
+            model.tab.goForward()
+            check("Go forward returns", model.tab.currentFolder.path == docs.standardizedFileURL.path)
 
             model.beginEditingAddress()
             check("the address field shows ~ paths", model.addressText == "~/Documents", model.addressText)
             model.addressText = "~/Documents/Work"
             model.commitAddress()
             try? await Task.sleep(for: .seconds(0.2))
-            check("a typed path goes there", model.currentFolder.path == work.standardizedFileURL.path)
+            check("a typed path goes there", model.tab.currentFolder.path == work.standardizedFileURL.path)
             model.beginEditingAddress()
             model.addressText = "~/Nope"
             model.commitAddress()
@@ -68,31 +68,31 @@ enum SelfTest {
 
             try? Data("new".utf8).write(to: work.appending(path: "Added.txt"))
             try? await Task.sleep(for: .seconds(2))
-            check("a file added from outside appears", model.items.contains { $0.name == "Added.txt" })
+            check("a file added from outside appears", model.tab.items.contains { $0.name == "Added.txt" })
 
             // S-010 Copy and paste
-            model.go(to: docs)
+            model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
             let notes = docs.appending(path: "Notes.txt")
-            model.selection = [notes]
+            model.tab.selection = [notes]
             model.copySelection()
-            model.go(to: work)
+            model.tab.go(to: work)
             model.paste()
             try? await Task.sleep(for: .seconds(1))
             check("Paste copies the item here", fm.fileExists(atPath: work.appending(path: "Notes.txt").path))
             check("Copy keeps the original", fm.fileExists(atPath: notes.path))
-            check("a copy shows in the list", model.items.contains { $0.name == "Notes.txt" })
+            check("a copy shows in the list", model.tab.items.contains { $0.name == "Notes.txt" })
 
             // S-011 Cut and paste to move
             let moveMe = work.appending(path: "Move me.txt")
             try? Data("m".utf8).write(to: moveMe)
-            model.go(to: docs)
-            model.go(to: work)
+            model.tab.go(to: docs)
+            model.tab.go(to: work)
             try? await Task.sleep(for: .seconds(0.4))
-            model.selection = [moveMe]
+            model.tab.selection = [moveMe]
             model.cutSelection()
             check("Cut leaves the item in place", fm.fileExists(atPath: moveMe.path) && model.isCut(moveMe))
-            model.go(to: docs)
+            model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
             check("Cut items stay until paste", fm.fileExists(atPath: moveMe.path))
             model.paste()
@@ -100,13 +100,13 @@ enum SelfTest {
             check("Paste moves the item", fm.fileExists(atPath: docs.appending(path: "Move me.txt").path) && !fm.fileExists(atPath: moveMe.path))
             check("Paste clears the cut", !model.isCut(moveMe))
             let again = docs.appending(path: "Move me.txt")
-            model.selection = [again]
+            model.tab.selection = [again]
             model.cutSelection()
             model.clearCut()
             check("Escape clears the cut", !model.isCut(again))
-            model.selection = [again]
+            model.tab.selection = [again]
             model.cutSelection()
-            model.selection = [docs.appending(path: "Notes.txt")]
+            model.tab.selection = [docs.appending(path: "Notes.txt")]
             model.copySelection()
             check("Copying something else clears the cut", !model.isCut(again))
 
@@ -115,11 +115,11 @@ enum SelfTest {
             try? fm.createDirectory(at: drop, withIntermediateDirectories: true)
             try? Data("old".utf8).write(to: drop.appending(path: "Notes.txt"))
             try? Data("old".utf8).write(to: drop.appending(path: "file2.txt"))
-            model.go(to: docs)
+            model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
-            model.selection = [docs.appending(path: "Notes.txt")]
+            model.tab.selection = [docs.appending(path: "Notes.txt")]
             model.copySelection()
-            model.go(to: drop)
+            model.tab.go(to: drop)
             model.paste()
             try? await Task.sleep(for: .seconds(0.5))
             check("a name conflict asks first", model.pendingConflict != nil)
@@ -127,11 +127,11 @@ enum SelfTest {
             try? await Task.sleep(for: .seconds(0.5))
             check("Skip leaves the existing file untouched",
                   (try? String(contentsOf: drop.appending(path: "Notes.txt"), encoding: .utf8)) == "old")
-            model.go(to: docs)
+            model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
-            model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
+            model.tab.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
             model.copySelection()
-            model.go(to: drop)
+            model.tab.go(to: drop)
             model.paste()
             try? await Task.sleep(for: .seconds(0.5))
             model.resolveConflict(.keepBoth, applyToAll: true)
@@ -144,17 +144,17 @@ enum SelfTest {
             // S-013 Move to Trash
             let trashDir = home.appending(path: ".Trash", directoryHint: .isDirectory)
             for n in ["a.txt", "b.txt", "c.txt"] { try? Data(n.utf8).write(to: drop.appending(path: "gone-\(n)")) }
-            model.go(to: drop)
+            model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.4))
-            let firstGone = model.items.firstIndex { $0.name == "gone-b.txt" } ?? 0
+            let firstGone = model.tab.items.firstIndex { $0.name == "gone-b.txt" } ?? 0
             // Select from the listing, as a click does: listed URLs can spell /tmp as /private/tmp.
-            @MainActor func pick(_ names: String...) { model.selection = Set(model.items.filter { names.contains($0.name) }.map(\.url)) }
+            @MainActor func pick(_ names: String...) { model.tab.selection = Set(model.tab.items.filter { names.contains($0.name) }.map(\.url)) }
             pick("gone-b.txt")
             model.trashSelection()
             try? await Task.sleep(for: .seconds(1))
             check("Move to Trash removes the item from the folder", !fm.fileExists(atPath: drop.appending(path: "gone-b.txt").path))
             check("the item is in the Trash", fm.fileExists(atPath: trashDir.appending(path: "gone-b.txt").path))
-            check("selection moves to the next item", model.selection == [model.items[min(firstGone, model.items.count - 1)].url], "selection \(model.selection) items \(model.items.map(\.name)) first \(firstGone)")
+            check("selection moves to the next item", model.tab.selection == [model.tab.items[min(firstGone, model.tab.items.count - 1)].url], "selection \(model.tab.selection) items \(model.tab.items.map(\.name)) first \(firstGone)")
             pick("gone-a.txt")
             model.askDeleteImmediately()
             check("Delete Immediately asks first", model.pendingDelete != nil && fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path))
@@ -166,8 +166,8 @@ enum SelfTest {
             // S-014 Undo file operations
             let um = model.undoManager
             for n in ["u1.txt", "u2.txt"] { try? Data(n.utf8).write(to: drop.appending(path: n)) }
-            model.go(to: docs)
-            model.go(to: drop)
+            model.tab.go(to: docs)
+            model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.5))
             pick("u1.txt")
             model.trashSelection()
@@ -185,7 +185,7 @@ enum SelfTest {
             check("Undo works again after Redo", fm.fileExists(atPath: drop.appending(path: "u1.txt").path))
             pick("u2.txt")
             model.cutSelection()
-            model.go(to: work)
+            model.tab.go(to: work)
             try? await Task.sleep(for: .seconds(0.3))
             model.paste()
             try? await Task.sleep(for: .seconds(1))
@@ -195,8 +195,8 @@ enum SelfTest {
             check("Undo of a move puts the item back", fm.fileExists(atPath: drop.appending(path: "u2.txt").path) && !fm.fileExists(atPath: work.appending(path: "u2.txt").path))
 
             // S-015 Rename and S-016 New folder
-            model.go(to: docs)
-            model.go(to: drop)
+            model.tab.go(to: docs)
+            model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.5))
             model.newFolder()
             try? await Task.sleep(for: .seconds(1))
@@ -206,7 +206,7 @@ enum SelfTest {
             model.commitRename()
             try? await Task.sleep(for: .seconds(1))
             check("Return in the name field renames", fm.fileExists(atPath: drop.appending(path: "Reports").path) && !fm.fileExists(atPath: drop.appending(path: "New folder").path))
-            check("the renamed item is selected", model.selectedItems.first?.name == "Reports", "\(model.selectedItems.map(\.name))")
+            check("the renamed item is selected", model.tab.selectedItems.first?.name == "Reports", "\(model.tab.selectedItems.map(\.name))")
             check("Edit > Undo names the rename", um.undoMenuItemTitle == "Undo Rename", um.undoMenuItemTitle)
             um.undo()
             try? await Task.sleep(for: .seconds(1))
@@ -229,10 +229,10 @@ enum SelfTest {
             let dest = drop.appending(path: "Dest", directoryHint: .isDirectory)
             try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
             for n in ["d1.txt", "d2.txt", "d3.txt"] { try? Data(n.utf8).write(to: drop.appending(path: n)) }
-            model.go(to: docs)
-            model.go(to: drop)
+            model.tab.go(to: docs)
+            model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.5))
-            @MainActor func listed(_ name: String) -> URL { model.items.first { $0.name == name }!.url }
+            @MainActor func listed(_ name: String) -> URL { model.tab.items.first { $0.name == name }!.url }
             model.dragStarted([listed("d3.txt")])
             check("a drag inside one volume moves", model.dropMode(into: dest) == .move)
             model.dragStarted([])

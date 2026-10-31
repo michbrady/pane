@@ -14,7 +14,7 @@ struct ContentView: View {
         } detail: {
             FolderPage()
         }
-        .navigationTitle(model.currentName)
+        .navigationTitle(model.tab.currentName)
         .noInitialFocus()
         .onChange(of: undoManager, initial: true) { _, manager in model.windowUndoManager = manager }
         .sheet(isPresented: .init(get: { model.progressVisible && model.pendingConflict == nil }, set: { _ in })) {

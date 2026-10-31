@@ -17,8 +17,8 @@ struct StatusBar: View {
     }
 
     private var summary: String {
-        let total = model.items.count
-        let picked = model.selectedItems
+        let total = model.tab.items.count
+        let picked = model.tab.selectedItems
         guard !picked.isEmpty else { return total == 1 ? "1 item" : "\(total) items" }
         let word = picked.count == 1 ? "1 item selected" : "\(picked.count) items selected"
         let bytes = picked.compactMap(\.size).reduce(0, +)

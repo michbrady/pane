@@ -15,8 +15,8 @@ struct NavigationPane: View {
             }
         }
         .onChange(of: model.navSelection) { _, id in
-            guard let id, let url = AppModel.url(forNavID: id), url != model.currentFolder else { return }
-            model.go(to: url)
+            guard let id, let url = AppModel.url(forNavID: id), url != model.tab.currentFolder else { return }
+            model.tab.go(to: url)
         }
     }
 }

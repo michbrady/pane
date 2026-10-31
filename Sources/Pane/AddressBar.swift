@@ -9,14 +9,14 @@ struct AddressBar: View {
 
     var body: some View {
         HStack(spacing: Space.sm) {
-            Button("Go back", systemImage: "chevron.backward") { model.goBack() }
-                .disabled(!model.canGoBack)
+            Button("Go back", systemImage: "chevron.backward") { model.tab.goBack() }
+                .disabled(!model.tab.canGoBack)
                 .help("Go back to the previous folder (⌘[)")
-            Button("Go forward", systemImage: "chevron.forward") { model.goForward() }
-                .disabled(!model.canGoForward)
+            Button("Go forward", systemImage: "chevron.forward") { model.tab.goForward() }
+                .disabled(!model.tab.canGoForward)
                 .help("Go forward to the next folder (⌘])")
-            Button("Go up", systemImage: "chevron.up") { model.goUp() }
-                .disabled(!model.canGoUp)
+            Button("Go up", systemImage: "chevron.up") { model.tab.goUp() }
+                .disabled(!model.tab.canGoUp)
                 .help("Go up to the parent folder (⌘↑)")
             field
         }
@@ -52,11 +52,11 @@ private struct BreadcrumbTrail: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let chain = Breadcrumbs.chain(for: model.currentFolder)
+        let chain = Breadcrumbs.chain(for: model.tab.currentFolder)
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
                 ForEach(chain, id: \.self) { url in
-                    Button(Locations.displayName(for: url)) { model.go(to: url) }
+                    Button(Locations.displayName(for: url)) { model.tab.go(to: url) }
                         .buttonStyle(.plain)
                         .padding(.horizontal, Space.xs)
                         .acceptsFileDrops(into: url, model: model)
@@ -87,7 +87,7 @@ private struct SiblingsMenu: View {
                 Text("No Folders")
             }
             ForEach(folders.prefix(Self.limit)) { item in
-                Button(item.name) { model.go(to: item.url) }
+                Button(item.name) { model.tab.go(to: item.url) }
             }
         } label: {
             Image(systemName: "chevron.right")
