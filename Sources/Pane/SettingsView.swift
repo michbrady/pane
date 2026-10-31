@@ -54,11 +54,16 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 struct GeneralSettings: View {
+    @Environment(AppModel.self) private var model
     @AppStorage("reopenLastFolder", store: Prefs.defaults) private var reopenLastFolder = true
 
     var body: some View {
+        @Bindable var view = model.view
         Section("Start") {
             Toggle("Open the last folder when Pane starts", isOn: $reopenLastFolder)
+        }
+        Section("Folders") {
+            Toggle("Show folders first", isOn: $view.foldersFirst)
         }
     }
 }

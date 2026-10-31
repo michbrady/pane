@@ -251,6 +251,22 @@ enum SelfTest {
             model.actions.alertMessage = nil
             check("a drop registers an undo", um.undoMenuItemTitle.hasPrefix("Undo Copy") || um.undoMenuItemTitle.hasPrefix("Undo Move"), um.undoMenuItemTitle)
 
+            // S-020 Sort by column and S-021 Folders first
+            model.tab.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.5))
+            model.view.setSort(.size, ascending: false)
+            let files = model.tab.items.filter { !$0.isFolder }
+            check("sorting by size puts the largest file first", files.first?.name == "Trip itinerary.pdf", files.first?.name ?? "nil")
+            check("Size sorts by bytes, not text", zip(files, files.dropFirst()).allSatisfy { ($0.size ?? 0) >= ($1.size ?? 0) })
+            check("folders stay first while sorting", model.tab.items.first?.isFolder == true)
+            model.view.foldersFirst = false
+            check("folders move into the order when folders first is off", model.tab.items.last?.isFolder == true, model.tab.items.last?.name ?? "nil")
+            model.view.foldersFirst = true
+            model.view.setSort(.name, ascending: false)
+            check("a second click reverses the order", model.tab.items.first(where: { !$0.isFolder })?.name == "Trip itinerary.pdf")
+            check("the sort is saved", ViewSettings().sortKey == .name && ViewSettings().ascending == false)
+            model.view.reset()
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

@@ -228,7 +228,8 @@ Depends: S-002
 Acceptance:
 - [snap] The header shows an arrow for the sort direction.
 - [unit] Name sorts naturally ("file2" before "file10"). Size sorts by bytes.
-Status: todo
+Note: the header arrow is the Table's own. Sort is saved between launches and is the same for every folder.
+Status: done
 
 ### S-021 Keep folders first
 As the user, I see folders above files by default, and can turn it off in Settings.
@@ -236,7 +237,8 @@ Depends: S-020
 Acceptance:
 - [unit] Folders sort first for every column.
 - [self] The setting applies at once.
-Status: todo
+Note: the switch is in Settings > General and applies at once.
+Status: done
 
 ### S-022 Choose and resize columns
 As the user, I right-click a header to add or hide columns and drag edges to resize.

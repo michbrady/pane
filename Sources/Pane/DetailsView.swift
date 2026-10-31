@@ -7,8 +7,8 @@ struct DetailsView: View {
 
     var body: some View {
         @Bindable var tab = model.tab
-        Table(of: FolderItem.self, selection: $tab.selection) {
-            TableColumn("Name") { item in
+        Table(of: FolderItem.self, selection: $tab.selection, sortOrder: sortOrder) {
+            TableColumn("Name", value: \.name) { item in
                 HStack(spacing: Space.sm) {
                     Image(nsImage: IconCache.icon(for: item.url, isFolder: item.isFolder))
                         .resizable()
@@ -25,16 +25,16 @@ struct DetailsView: View {
                 .opacity(model.actions.isCut(item.url) ? Surfaces.cutOpacity : 1)
             }
             .width(min: 160, ideal: 280)
-            TableColumn("Date modified") { item in
+            TableColumn("Date modified", value: \.sortModified) { item in
                 Text(item.modified.map(Format.date) ?? "")
                     .foregroundStyle(.secondary)
             }
             .width(min: 120, ideal: 150)
-            TableColumn("Type") { item in
+            TableColumn("Type", value: \.kind) { item in
                 Text(item.kind).foregroundStyle(.secondary).lineLimit(1)
             }
             .width(min: 80, ideal: 140)
-            TableColumn("Size") { item in
+            TableColumn("Size", value: \.sortSize) { item in
                 Text(item.size.map(Format.size) ?? "—")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -80,6 +80,28 @@ struct DetailsView: View {
         .alternatingRowBackgrounds(.disabled)
         .overlay { stateOverlay }
         .animation(nil, value: model.tab.items)
+    }
+
+    /// The Table shows the sort arrow from this, and a click on a header writes it back.
+    private var sortOrder: Binding<[KeyPathComparator<FolderItem>]> {
+        Binding(
+            get: {
+                let order: SortOrder = model.view.ascending ? .forward : .reverse
+                switch model.view.sortKey {
+                case .name: return [KeyPathComparator(\FolderItem.name, order: order)]
+                case .modified: return [KeyPathComparator(\FolderItem.sortModified, order: order)]
+                case .kind: return [KeyPathComparator(\FolderItem.kind, order: order)]
+                case .size: return [KeyPathComparator(\FolderItem.sortSize, order: order)]
+                }
+            },
+            set: { comparators in
+                guard let first = comparators.first else { return }
+                let path = first.keyPath as AnyKeyPath
+                let key: SortKey = path == \FolderItem.sortModified ? .modified
+                    : path == \FolderItem.kind ? .kind
+                    : path == \FolderItem.sortSize ? .size : .name
+                model.view.setSort(key, ascending: first.order == .forward)
+            })
     }
 
     @ViewBuilder

@@ -23,6 +23,7 @@ final class FolderTab {
     /// the Address bar, and the saved folder.
     var didNavigate: (() -> Void)?
 
+    let view: ViewSettings
     private let watcher = FolderWatcher()
     private var generation = 0
     private var reloadTask: Task<Void, Never>?
@@ -34,7 +35,8 @@ final class FolderTab {
     var canGoUp: Bool { Breadcrumbs.parent(of: currentFolder) != nil }
     var selectedItems: [FolderItem] { items.filter { selection.contains($0.url) } }
 
-    init(start: URL) {
+    init(start: URL, view: ViewSettings) {
+        self.view = view
         history = NavigationHistory(start: Self.canonical(start))
     }
 
@@ -136,7 +138,7 @@ final class FolderTab {
             isSlow = false
             switch result {
             case .success(let listed):
-                items = listed
+                items = sorted(listed)
                 loadError = nil
                 let still = Set(listed.map(\.url))
                 selection = selection.intersection(still)
@@ -165,6 +167,15 @@ final class FolderTab {
                 loadError = "Unable to read this folder."
             }
         }
+    }
+
+    private func sorted(_ listed: [FolderItem]) -> [FolderItem] {
+        FolderSorter.sorted(listed, key: view.sortKey, ascending: view.ascending, foldersFirst: view.foldersFirst)
+    }
+
+    /// Orders the current listing again, after the sort or folders-first setting changed.
+    func resort() {
+        items = sorted(items)
     }
 
     private func scheduleReload() {

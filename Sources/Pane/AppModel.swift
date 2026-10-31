@@ -6,6 +6,7 @@ import PaneKit
 /// App-wide state that menus, toolbars, and views share.
 @Observable
 final class AppModel {
+    let view = ViewSettings()
     let tab: FolderTab
     let actions = FileActions()
 
@@ -48,7 +49,8 @@ final class AppModel {
         } else if !FileManager.default.fileExists(atPath: start.path) {
             start = Locations.home
         }
-        tab = FolderTab(start: start)
+        tab = FolderTab(start: start, view: view)
+        view.onChange = { [unowned self] in tab.resort() }
         tab.didNavigate = { [unowned self] in
             isEditingAddress = false
             syncTree()

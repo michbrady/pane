@@ -184,6 +184,37 @@ private func makeFS() -> InMemoryFileSystem {
     #expect(!DropRules.sameVolume([root.appending(path: "missing")], as: root.appending(path: "b")))
 }
 
+private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modified: Double? = nil, kind: String = "File") -> FolderItem {
+    FolderItem(url: URL(fileURLWithPath: "/x/\(name)"), name: name, isFolder: folder, size: folder ? nil : size,
+               modified: modified.map { Date(timeIntervalSince1970: $0) }, kind: folder ? "File folder" : kind)
+}
+
+@Test func sortByNameIsNaturalAndKeepsFoldersFirst() {
+    let items = [item("file10.txt"), item("Zed", folder: true), item("file2.txt"), item("alpha", folder: true)]
+    let up = FolderSorter.sorted(items, key: .name, ascending: true, foldersFirst: true).map(\.name)
+    #expect(up == ["alpha", "Zed", "file2.txt", "file10.txt"])
+    let down = FolderSorter.sorted(items, key: .name, ascending: false, foldersFirst: true).map(\.name)
+    #expect(down == ["Zed", "alpha", "file10.txt", "file2.txt"])
+}
+
+@Test func sortBySizeUsesBytesNotText() {
+    let items = [item("a", size: 900), item("b", size: 1_500_000), item("c", size: 20_000)]
+    #expect(FolderSorter.sorted(items, key: .size, ascending: true, foldersFirst: true).map(\.name) == ["a", "c", "b"])
+    #expect(FolderSorter.sorted(items, key: .size, ascending: false, foldersFirst: true).map(\.name) == ["b", "c", "a"])
+}
+
+@Test func foldersFirstCanBeTurnedOff() {
+    let items = [item("b.txt", size: 5), item("A", folder: true), item("c.txt", size: 1)]
+    #expect(FolderSorter.sorted(items, key: .name, ascending: true, foldersFirst: false).map(\.name) == ["A", "b.txt", "c.txt"])
+    #expect(FolderSorter.sorted(items, key: .size, ascending: false, foldersFirst: false).map(\.name) == ["b.txt", "c.txt", "A"])
+}
+
+@Test func sortByDateAndKindFallBackToName() {
+    let items = [item("b", modified: 100, kind: "PDF"), item("a", modified: 100, kind: "PDF"), item("c", modified: 50, kind: "Text")]
+    #expect(FolderSorter.sorted(items, key: .modified, ascending: true, foldersFirst: true).map(\.name) == ["c", "a", "b"])
+    #expect(FolderSorter.sorted(items, key: .kind, ascending: true, foldersFirst: true).map(\.name) == ["a", "b", "c"])
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }
