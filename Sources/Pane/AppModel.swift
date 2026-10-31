@@ -37,6 +37,17 @@ final class AppModel {
         didSet { if !Locations.isOverridden { UserDefaults.standard.set(settingsTab.rawValue, forKey: "settings.tab") } }
     }
 
+    // File operations
+    private(set) var clipboard = Clipboard()
+    private let operations = FileOperations(LocalFileSystem())
+    /// The running copy or move. A sheet shows it once it takes more than a second.
+    private(set) var progress: OperationProgress?
+    private(set) var progressTitle = ""
+    private(set) var progressVisible = false
+    private var operationTask: Task<Void, Never>?
+    /// A message for an alert, after something failed.
+    var alertMessage: String?
+
     private let watcher = FolderWatcher()
     private var generation = 0
     private var reloadTask: Task<Void, Never>?
@@ -143,6 +154,88 @@ final class AppModel {
         Prefs.defaults.set(currentFolder.path, forKey: "pane.folder")
         watcher.watch(currentFolder) { [weak self] in self?.scheduleReload() }
         reload()
+    }
+
+    // MARK: Copy, cut, paste
+
+    private var editingText: NSText? { NSApp.keyWindow?.firstResponder as? NSText }
+    var canCopy: Bool { !selection.isEmpty || isEditingAddress }
+
+    func isCut(_ url: URL) -> Bool { clipboard.isCut(url) }
+
+    func copySelection() {
+        if let text = editingText { text.copy(nil); return }
+        guard !selection.isEmpty else { return }
+        clipboard.write(Array(selection), cut: false)
+    }
+
+    func cutSelection() {
+        if let text = editingText { text.cut(nil); return }
+        guard !selection.isEmpty else { return }
+        clipboard.write(Array(selection), cut: true)
+    }
+
+    func clearCut() {
+        clipboard.clearCut()
+    }
+
+    func paste() {
+        if let text = editingText { text.paste(nil); return }
+        let sources = clipboard.urls
+        guard !sources.isEmpty, operationTask == nil else { return }
+        let mode: PasteMode = clipboard.isCutActive ? .move : .copy
+        run(title: mode == .copy ? "Copying" : "Moving") { [self] in
+            await operations.paste(sources, into: currentFolder, mode: mode,
+                                   resolve: { _ in ConflictDecision(choice: .skip) },
+                                   progress: { p in Task { @MainActor in self.progress = p } })
+        } finished: { [self] result in
+            if mode == .move { clipboard.clearCut() }
+            return result
+        }
+    }
+
+    /// Runs an operation in the background. The progress sheet shows after one second.
+    private func run(title: String, _ work: @escaping () async -> OperationResult,
+                     finished: @escaping (OperationResult) -> OperationResult) {
+        progressTitle = title
+        progress = nil
+        progressVisible = false
+        operationTask = Task {
+            let reveal = Task {
+                try? await Task.sleep(for: .seconds(1))
+                if !Task.isCancelled { progressVisible = true }
+            }
+            let result = finished(await work())
+            reveal.cancel()
+            progressVisible = false
+            progress = nil
+            operationTask = nil
+            report(result)
+            reload()
+        }
+    }
+
+    /// For snapshots: shows the progress sheet without a long copy.
+    func showProgressForSnapshot() {
+        progressTitle = "Copying"
+        progress = OperationProgress(done: 3, total: 12, current: "Quarterly review.docx")
+        progressVisible = true
+    }
+
+    func hideProgressForSnapshot() {
+        progressVisible = false
+        progress = nil
+    }
+
+    func cancelOperation() {
+        operationTask?.cancel()
+    }
+
+    private func report(_ result: OperationResult) {
+        if let first = result.failures.first {
+            let more = result.failures.count > 1 ? " \(result.failures.count - 1) more failed." : ""
+            alertMessage = "Unable to complete \(first.url.lastPathComponent). \(first.message)\(more)"
+        }
     }
 
     // MARK: Listing

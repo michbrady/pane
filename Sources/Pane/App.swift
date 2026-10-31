@@ -33,6 +33,16 @@ struct PaneApp: App {
                     .keyboardShortcut(.downArrow, modifiers: .command)
                     .disabled(model.selection.isEmpty)
             }
+            CommandGroup(replacing: .pasteboard) {
+                Button("Cut") { model.cutSelection() }
+                    .keyboardShortcut("x")
+                    .disabled(!model.canCopy)
+                Button("Copy") { model.copySelection() }
+                    .keyboardShortcut("c")
+                    .disabled(!model.canCopy)
+                Button("Paste") { model.paste() }
+                    .keyboardShortcut("v")
+            }
             CommandMenu("Go") {
                 Button("Back") { model.goBack() }
                     .keyboardShortcut("[")

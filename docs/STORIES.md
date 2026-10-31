@@ -147,7 +147,8 @@ Depends: S-003
 Acceptance:
 - [unit] Copying a folder copies its contents and keeps dates.
 - [self] A progress sheet shows for operations over one second.
-Status: todo
+Note: until S-012 lands, a name conflict skips the item. The progress sheet shows after one second (snapshot page `progress`).
+Status: done
 
 ### S-011 Cut and paste to move
 As the user, I press Cmd+X on files and Cmd+V elsewhere to move them.

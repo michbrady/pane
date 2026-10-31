@@ -26,6 +26,12 @@ public struct OperationProgress: Sendable {
     public let done: Int
     public let total: Int
     public let current: String
+
+    public init(done: Int, total: Int, current: String) {
+        self.done = done
+        self.total = total
+        self.current = current
+    }
 }
 
 public struct OperationFailure: Sendable {

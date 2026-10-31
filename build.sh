@@ -14,10 +14,15 @@ config=release
 [[ " $* " == *" --debug "* ]] && config=debug
 
 # Sign with your Apple Development certificate when you have one (Xcode >
-# Settings > Accounts). Otherwise sign ad hoc, which is fine for your own Mac.
+# Settings > Accounts), else a Developer ID Application certificate. A stable
+# signature keeps Full Disk Access across rebuilds. Otherwise sign ad hoc.
+# ./release.sh signs for distribution and notarizes.
 identity="${SIGN_IDENTITY:-}"
 if [[ -z "$identity" ]]; then
   identity=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 -o '"Apple Development: [^"]*"' | tr -d '"' || true)
+fi
+if [[ -z "$identity" ]]; then
+  identity=$(security find-identity -v -p codesigning 2>/dev/null | grep -m1 -o '"Developer ID Application: [^"]*"' | tr -d '"' || true)
 fi
 [[ -n "$identity" ]] || identity=-
 

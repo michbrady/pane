@@ -70,6 +70,19 @@ enum SelfTest {
             try? await Task.sleep(for: .seconds(2))
             check("a file added from outside appears", model.items.contains { $0.name == "Added.txt" })
 
+            // S-010 Copy and paste
+            model.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.3))
+            let notes = docs.appending(path: "Notes.txt")
+            model.selection = [notes]
+            model.copySelection()
+            model.go(to: work)
+            model.paste()
+            try? await Task.sleep(for: .seconds(1))
+            check("Paste copies the item here", fm.fileExists(atPath: work.appending(path: "Notes.txt").path))
+            check("Copy keeps the original", fm.fileExists(atPath: notes.path))
+            check("a copy shows in the list", model.items.contains { $0.name == "Notes.txt" })
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

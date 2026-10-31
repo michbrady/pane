@@ -14,6 +14,14 @@ struct ContentView: View {
         }
         .navigationTitle(model.currentName)
         .noInitialFocus()
+        .sheet(isPresented: .init(get: { model.progressVisible }, set: { _ in })) {
+            OperationSheet()
+        }
+        .alert("Pane", isPresented: .init(get: { model.alertMessage != nil }, set: { if !$0 { model.alertMessage = nil } })) {
+            Button("OK") {}
+        } message: {
+            Text(model.alertMessage ?? "")
+        }
         .background(FrameAutosave(name: "PaneMain"))
         .task {
             SelfTest.runIfRequested(model: model)
@@ -84,5 +92,35 @@ private struct CommandBar: ToolbarContent {
                 .help("Choose how items are shown")
                 .disabled(true)
         }
+    }
+}
+
+/// Shows a long copy or move: what is happening, how far along, and Cancel.
+struct OperationSheet: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.md) {
+            Text(title).font(.headline)
+            if let p = model.progress {
+                ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
+                Text(p.current).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            } else {
+                ProgressView().progressViewStyle(.linear)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { model.cancelOperation() }
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(Space.xl)
+        .frame(width: Layout.sheetWidth)
+        .noInitialFocus()
+    }
+
+    private var title: String {
+        guard let p = model.progress else { return model.progressTitle + "…" }
+        return "\(model.progressTitle) \(min(p.done + 1, p.total)) of \(p.total)"
     }
 }

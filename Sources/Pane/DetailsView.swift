@@ -18,6 +18,7 @@ struct DetailsView: View {
                         .truncationMode(.middle)
                         .help(item.name)
                 }
+                .opacity(model.isCut(item.url) ? Surfaces.cutOpacity : 1)
             }
             .width(min: 160, ideal: 280)
             TableColumn("Date modified") { item in
@@ -46,6 +47,10 @@ struct DetailsView: View {
         .onKeyPress(.return) {
             guard !model.selection.isEmpty else { return .ignored }
             model.openSelection()
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            model.clearCut()
             return .handled
         }
         .alternatingRowBackgrounds(.disabled)

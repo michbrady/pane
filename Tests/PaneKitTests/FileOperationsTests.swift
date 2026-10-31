@@ -142,6 +142,23 @@ private func makeFS() -> InMemoryFileSystem {
     #expect(moved.failures.isEmpty && !FileManager.default.fileExists(atPath: src.appending(path: "a.txt").path))
 }
 
+@Test func copyKeepsTheModifiedDateAndFolderContents() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-date-\(UUID().uuidString)")
+    let folder = root.appending(path: "src/Docs"), dst = root.appending(path: "dst")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: dst, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = folder.appending(path: "a.txt")
+    try Data("x".utf8).write(to: file)
+    let old = Date(timeIntervalSince1970: 1_000_000_000)
+    try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: file.path)
+    let result = await FileOperations(LocalFileSystem()).paste([folder], into: dst, mode: .copy, resolve: keepAsking)
+    #expect(result.failures.isEmpty)
+    let copied = dst.appending(path: "Docs/a.txt")
+    let date = try copied.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    #expect(date == old)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }
