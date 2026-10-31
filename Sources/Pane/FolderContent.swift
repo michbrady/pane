@@ -31,6 +31,11 @@ struct FolderContent: View {
             model.actions.trashSelection()
             return .handled
         }
+        .onKeyPress(.space) {
+            guard !model.tab.selection.isEmpty || QuickLookController.shared.isVisible else { return .ignored }
+            model.toggleQuickLook()
+            return .handled
+        }
         .onKeyPress(.escape) {
             model.actions.clearCut()
             return .handled

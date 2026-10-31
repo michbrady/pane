@@ -136,6 +136,19 @@ final class AppModel {
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
 
+    // MARK: Quick Look
+
+    /// Space: open Quick Look for the selected items, or close it if it is open.
+    func toggleQuickLook() {
+        let controller = QuickLookController.shared
+        controller.model = self
+        if controller.isVisible {
+            controller.close()
+        } else {
+            controller.show(tab.selectedItems.map(\.url))
+        }
+    }
+
     // MARK: Tags
 
     func tags(of url: URL) -> [String] {

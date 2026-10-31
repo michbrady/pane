@@ -398,6 +398,26 @@ enum SelfTest {
             check("every standard tag except Gray has its own color", TagEditor.standard.filter { $0 != "Gray" }.allSatisfy { TagColor.color($0) != .gray })
             check("a custom tag is gray", TagColor.color("Taxes") == .gray)
 
+            // S-032 Quick Look with Space
+            model.tab.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.4))
+            model.tab.selection = Set(model.tab.items.filter { $0.name == "Notes.txt" }.map(\.url))
+            model.toggleQuickLook()
+            try? await Task.sleep(for: .seconds(0.8))
+            check("Space opens Quick Look", QuickLookController.shared.isVisible)
+            check("Quick Look shows the selected file", QuickLookController.shared.urls.map(\.lastPathComponent) == ["Notes.txt"],
+                  "\(QuickLookController.shared.urls.map(\.lastPathComponent))")
+            model.tab.moveSelection(by: 1)
+            QuickLookController.shared.update(model.tab.selectedItems.map(\.url))
+            check("an arrow key moves to the next file", model.tab.selectedItems.first?.name == "Quarterly review.docx" && QuickLookController.shared.urls.first?.lastPathComponent == "Quarterly review.docx",
+                  model.tab.selectedItems.first?.name ?? "nil")
+            model.toggleQuickLook()
+            try? await Task.sleep(for: .seconds(0.5))
+            check("Space closes Quick Look", !QuickLookController.shared.isVisible)
+            model.tab.selection = []
+            model.tab.moveSelection(by: 1)
+            check("an arrow key with nothing selected picks the first item", model.tab.selectedItems.first?.name == model.tab.items.first?.name)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

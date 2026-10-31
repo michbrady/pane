@@ -334,7 +334,8 @@ As the user, I press Space on a file to preview it in Quick Look.
 Depends: S-002
 Acceptance:
 - [self] Space opens and closes Quick Look. Arrow keys change the file.
-Status: todo
+Note: tested through the model (the panel opens, follows the selection, and closes). The real Space key and the arrow keys inside the panel need a hand test [manual]. Space is not in the menu on purpose, so it still types in text fields.
+Status: done
 
 ### S-033 See Properties
 As the user, I press Cmd+I to see size, dates, kind, location and permissions.

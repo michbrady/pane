@@ -87,6 +87,13 @@ final class FolderTab: Identifiable {
         for item in chosen where !item.isFolder { openFile(item.url) }
     }
 
+    /// Moves the selection to the next or previous item, and keeps it inside the list.
+    func moveSelection(by delta: Int) {
+        guard !items.isEmpty else { return }
+        let current = items.firstIndex { selection.contains($0.url) } ?? (delta > 0 ? -1 : items.count)
+        selection = [items[min(max(current + delta, 0), items.count - 1)].url]
+    }
+
     func openSelection() {
         open(Array(selection))
     }

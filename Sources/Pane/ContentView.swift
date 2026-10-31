@@ -17,6 +17,7 @@ struct ContentView: View {
         .navigationTitle(model.tab.currentName)
         .noInitialFocus()
         .onChange(of: undoManager, initial: true) { _, manager in model.actions.windowUndoManager = manager }
+        .onChange(of: model.tab.selection) { QuickLookController.shared.update(model.tab.selectedItems.map(\.url)) }
         .sheet(isPresented: .init(get: { model.actions.progressVisible && model.actions.pendingConflict == nil }, set: { _ in })) {
             OperationSheet()
         }
