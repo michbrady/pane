@@ -24,6 +24,15 @@ final class FolderTab: Identifiable {
     var didNavigate: (() -> Void)?
 
     let view: ViewSettings
+    /// What is typed in the Search box. Setting it does not search: call `search(_:)`.
+    var searchText = ""
+    /// True while the list shows search results instead of the folder.
+    private(set) var isSearching = false
+    /// True until the search has looked everywhere.
+    private(set) var isSearchRunning = false
+    /// Spotlight, when the app has it. Tests leave it nil, so they scan.
+    var spotlight: SpotlightSearching?
+    private var searchTask: Task<Void, Never>?
     private let watcher = FolderWatcher()
     /// Whether the last listing included hidden items.
     private var listedHidden = false
@@ -121,6 +130,7 @@ final class FolderTab: Identifiable {
     }
 
     private func afterNavigation() {
+        endSearch(reload: false)
         selection = []
         didNavigate?()
         watcher.watch(currentFolder) { [weak self] in self?.scheduleReload() }
@@ -129,7 +139,48 @@ final class FolderTab: Identifiable {
 
     // MARK: Listing
 
+    // MARK: Search
+
+    /// Looks for the text in this folder and everything below it. Results stream in, in the
+    /// chosen order. Empty text ends the search and shows the folder again.
+    func search(_ text: String) {
+        searchTask?.cancel()
+        let trimmed = text.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { endSearch(); return }
+        isSearching = true
+        isSearchRunning = true
+        items = []
+        selection = []
+        loadError = nil
+        let folder = currentFolder, hidden = view.showHidden, spotlight = spotlight
+        searchTask = Task {
+            // Wait for a pause in typing, so each letter does not start a new search.
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            var found: [FolderItem] = []
+            for await batch in FileSearch.results(for: trimmed, in: folder, spotlight: spotlight, showHidden: hidden) {
+                if Task.isCancelled { return }
+                found += batch
+                items = sorted(found)
+            }
+            if !Task.isCancelled { isSearchRunning = false }
+        }
+    }
+
+    /// Escape, or an empty Search box: back to the folder.
+    func endSearch(reload shouldReload: Bool = true) {
+        guard isSearching || !searchText.isEmpty else { return }
+        searchTask?.cancel()
+        let wasSearching = isSearching
+        isSearching = false
+        isSearchRunning = false
+        searchText = ""
+        if wasSearching, shouldReload { reload() }
+    }
+
     func reload() {
+        // A change in the folder does not replace search results.
+        guard !isSearching else { return }
         let folder = currentFolder
         let hidden = view.showHidden
         listedHidden = hidden
@@ -146,6 +197,8 @@ final class FolderTab: Identifiable {
             guard mine == generation else { return }
             isLoading = false
             isSlow = false
+            // A search that began while this listing was loading keeps its results.
+            guard !isSearching else { return }
             switch result {
             case .success(let listed):
                 items = sorted(listed)

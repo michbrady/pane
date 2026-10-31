@@ -37,7 +37,12 @@ struct FolderContent: View {
             return .handled
         }
         .onKeyPress(.escape) {
-            model.actions.clearCut()
+            // Escape ends a search first. Otherwise it clears Cut.
+            if model.tab.isSearching {
+                model.tab.endSearch()
+            } else {
+                model.actions.clearCut()
+            }
             return .handled
         }
         .overlay { stateOverlay }
@@ -53,6 +58,12 @@ struct FolderContent: View {
                 Text("Pane needs Full Disk Access to read protected folders.")
             } actions: {
                 Button("Open Settings") { Permissions.openFullDiskAccess() }
+            }
+        } else if model.tab.isSearching, model.tab.items.isEmpty {
+            if model.tab.isSearchRunning {
+                ProgressView("Searching…")
+            } else {
+                ContentUnavailableView.search(text: model.tab.searchText)
             }
         } else if model.tab.isSlow {
             ProgressView("Loading…")

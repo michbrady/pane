@@ -372,6 +372,64 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(PreviewKind.textPreview(of: file.appending(path: "missing")) == nil)
 }
 
+private struct FakeSpotlight: SpotlightSearching {
+    let urls: [URL]
+    func search(_ text: String, in folder: URL) async -> [URL] { urls }
+}
+
+private func searchTree() throws -> URL {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-search-\(UUID().uuidString)")
+    let fm = FileManager.default
+    try fm.createDirectory(at: root.appending(path: "Work/Deep"), withIntermediateDirectories: true)
+    try fm.createDirectory(at: root.appending(path: ".hiddenfolder"), withIntermediateDirectories: true)
+    for path in ["Budget 2026.xlsx", "Work/Budget notes.txt", "Work/Deep/old BUDGET.md", "Work/Roadmap.key",
+                 ".hiddenfolder/budget secret.txt", "Café.txt"] {
+        try Data("x".utf8).write(to: root.appending(path: path))
+    }
+    return root
+}
+
+private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching? = nil, showHidden: Bool = false) async -> [String] {
+    var names: [String] = []
+    for await batch in FileSearch.results(for: text, in: root, spotlight: spotlight, showHidden: showHidden) { names += batch.map(\.name) }
+    return names.sorted()
+}
+
+@Test func searchFindsNamesBelowTheFolderIgnoringCase() async throws {
+    let root = try searchTree()
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(await collect("budget", in: root) == ["Budget 2026.xlsx", "Budget notes.txt", "old BUDGET.md"])
+    #expect(await collect("roadmap", in: root) == ["Roadmap.key"])
+    #expect(await collect("nothing here", in: root).isEmpty)
+}
+
+@Test func searchIgnoresAccentsAndSkipsHiddenItemsUnlessAsked() async throws {
+    let root = try searchTree()
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(await collect("cafe", in: root) == ["Café.txt"])
+    #expect(await collect("secret", in: root).isEmpty)
+    #expect(await collect("secret", in: root, showHidden: true) == ["budget secret.txt"])
+}
+
+@Test func searchPrefersSpotlightWhenItAnswers() async throws {
+    let root = try searchTree()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let spotlight = FakeSpotlight(urls: [root.appending(path: "Work/Roadmap.key")])
+    #expect(await collect("budget", in: root, spotlight: spotlight) == ["Roadmap.key"])
+}
+
+@Test func searchFallsBackToAScanWhenSpotlightHasNothing() async throws {
+    let root = try searchTree()
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(await collect("roadmap", in: root, spotlight: FakeSpotlight(urls: [])) == ["Roadmap.key"])
+}
+
+@Test func theMatchRuleIgnoresCaseAndAccents() {
+    #expect(FileSearch.matches("Résumé Final.PDF", "resume"))
+    #expect(FileSearch.matches("notes.txt", "NOTES"))
+    #expect(!FileSearch.matches("notes.txt", "memo"))
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

@@ -13,6 +13,11 @@ final class AppModel {
     var tab: FolderTab { tabs[activeIndex] }
     let actions = FileActions()
 
+    /// Cmd-F and F3 add one, and the Search box takes the focus.
+    private(set) var searchFocusRequests = 0
+
+    func focusSearch() { searchFocusRequests += 1 }
+
     /// The items whose Properties panel is open.
     private(set) var propertiesURLs: [URL]?
 
@@ -74,6 +79,7 @@ final class AppModel {
 
     private func makeTab(start: URL) -> FolderTab {
         let tab = FolderTab(start: start, view: view)
+        tab.spotlight = Locations.isOverridden ? nil : SystemSpotlight()
         tab.didNavigate = { [unowned self, unowned tab] in
             // A tab in the background changes nothing outside itself.
             if tab === self.tab { activated() } else { saveTabs() }

@@ -42,3 +42,9 @@ Symptom: selecting a damaged or fake image showed a spinner in the preview pane 
 Cause: the pane showed a spinner while the image was nil, and nil also meant "loading finished and failed".
 Fix: a `failed` flag, set when loading ends with nothing, shows the file's icon instead.
 Rule: a loading state needs an end state for failure. Never use "no value yet" to mean both "loading" and "gave up".
+
+## "Space closes Quick Look" failed once in a full run (S-030 run)
+Symptom: one self-test check failed in one run and passed in the others.
+Cause: the preview panel closes with a short animation, and the check looked 0.5 seconds after.
+Fix: the panel closes with `close()`, and the check waits up to two seconds for it to hide.
+Rule: wait for a UI state with a bounded poll. Never sleep a fixed time and then read it.

@@ -63,9 +63,10 @@ extension ContentView {
 /// The content column: Address bar, Details view, Status bar, and the Command bar.
 struct FolderPage: View {
     @Environment(AppModel.self) private var model
-    @State private var search = ""
+    @FocusState private var searchFocused: Bool
 
     var body: some View {
+        @Bindable var tab = model.tab
         VStack(spacing: 0) {
             TabStrip()
             Divider()
@@ -75,16 +76,23 @@ struct FolderPage: View {
             Divider()
             StatusBar()
         }
-        // The Search box and the Command bar show their place now. Search (S-030)
-        // and the commands (S-041) come in later stories, so they stay dimmed.
+        // The Command bar buttons come in S-041, so they stay dimmed until then.
         .background {
-            // F4 focuses the Address bar, like Explorer. Cmd-L is in the Go menu.
+            // F4 focuses the Address bar and F3 the Search box, like Explorer.
+            // Cmd-L and Cmd-F are in the menus.
             Button("Go to Address") { model.beginEditingAddress() }
                 .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF4FunctionKey)!)), modifiers: [])
                 .opacity(0)
                 .accessibilityHidden(true)
+            Button("Search") { model.focusSearch() }
+                .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF3FunctionKey)!)), modifiers: [])
+                .opacity(0)
+                .accessibilityHidden(true)
         }
-        .searchable(text: $search, prompt: "Search")
+        .searchable(text: $tab.searchText, prompt: "Search")
+        .searchFocused($searchFocused)
+        .onChange(of: tab.searchText) { _, text in tab.search(text) }
+        .onChange(of: model.searchFocusRequests) { searchFocused = true }
         .toolbar { CommandBar(view: model.view) }
     }
 }

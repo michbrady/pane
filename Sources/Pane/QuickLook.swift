@@ -28,7 +28,7 @@ final class QuickLookController: NSObject, @preconcurrency QLPreviewPanelDataSou
     }
 
     func close() {
-        QLPreviewPanel.shared()?.orderOut(nil)
+        QLPreviewPanel.shared()?.close()
     }
 
     // MARK: Data source

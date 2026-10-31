@@ -318,7 +318,8 @@ Acceptance:
 - [self] Results stream in and the list shows a Location column.
 - [unit] Search uses Spotlight for indexed folders. It falls back to a file scan for others.
 - [self] Escape clears search and restores the folder.
-Status: todo
+Note: the file scan and the Spotlight-or-scan choice are unit tested with a fake Spotlight, and the app tests run the scan. The real Spotlight lookup (`NSMetadataQuery`) is built but not exercised, because the test folder is not indexed: try a search in your real home folder [manual]. Cmd-F and F3 focus the box, and Escape clears it. Search covers the folder and everything below it, by name only.
+Status: done
 
 ### S-031 Show a preview pane
 As the user, I toggle a preview pane that shows the selected file.

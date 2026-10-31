@@ -54,6 +54,17 @@ struct DetailsView: View {
                     }
                     .width(min: 60, ideal: 80)
                     .customizationID("size")
+                    // Search results come from many folders, so they show where each one lives.
+                    TableColumn("Location") { item in
+                        Text(Self.locationText(item))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .help(item.url.deletingLastPathComponent().path)
+                    }
+                    .width(min: 100, ideal: 220)
+                    .customizationID("location")
+                    .defaultVisibility(tab.isSearching ? .visible : .hidden)
                 } rows: {
                     ForEach(tab.items) { item in
                         TableRow(item).draggable(item.url)
@@ -67,6 +78,13 @@ struct DetailsView: View {
             model.tab.open(Array(urls))
         }
         .alternatingRowBackgrounds(.disabled)
+    }
+
+    /// The folder an item is in, with the home folder written as "~".
+    private static func locationText(_ item: FolderItem) -> String {
+        let folder = item.url.deletingLastPathComponent().standardizedFileURL.path
+        let home = Locations.home.path
+        return folder == home ? "~" : (folder.hasPrefix(home + "/") ? "~" + folder.dropFirst(home.count) : folder)
     }
 
     /// Which columns show, and their order and widths. Saved for each folder.

@@ -412,7 +412,8 @@ enum SelfTest {
             check("an arrow key moves to the next file", model.tab.selectedItems.first?.name == "Quarterly review.docx" && QuickLookController.shared.urls.first?.lastPathComponent == "Quarterly review.docx",
                   model.tab.selectedItems.first?.name ?? "nil")
             model.toggleQuickLook()
-            try? await Task.sleep(for: .seconds(0.5))
+            // The panel closes with a short animation, so wait for it rather than guess.
+            for _ in 0..<20 where QuickLookController.shared.isVisible { try? await Task.sleep(for: .milliseconds(100)) }
             check("Space closes Quick Look", !QuickLookController.shared.isVisible)
             model.tab.selection = []
             model.tab.moveSelection(by: 1)
@@ -426,6 +427,34 @@ enum SelfTest {
             check("Notes.txt previews as text and a photo as an image",
                   PreviewKind.kind(for: URL(fileURLWithPath: "/x/Notes.txt")) == .text && PreviewKind.kind(for: URL(fileURLWithPath: "/x/Beach.jpg")) == .image)
             model.view.reset()
+
+            // S-030 Search from the top bar
+            model.tab.go(to: home)
+            try? await Task.sleep(for: .seconds(0.5))
+            model.tab.searchText = "roadmap"
+            model.tab.search("roadmap")
+            try? await Task.sleep(for: .seconds(1.5))
+            check("search finds a file in a folder below, ignoring case", model.tab.isSearching && model.tab.items.map(\.name) == ["Roadmap.key"],
+                  "\(model.tab.items.map(\.name))")
+            check("the search has finished", !model.tab.isSearchRunning)
+            model.tab.search("zzzz")
+            try? await Task.sleep(for: .seconds(1.2))
+            check("no results leaves an empty list and says so", model.tab.items.isEmpty && model.tab.isSearching && !model.tab.isSearchRunning)
+            model.tab.endSearch()
+            try? await Task.sleep(for: .seconds(0.8))
+            check("Escape restores the folder", !model.tab.isSearching && model.tab.searchText.isEmpty && model.tab.items.contains { $0.name == "Documents" })
+            model.tab.searchText = "notes"
+            model.tab.search("notes")
+            try? await Task.sleep(for: .seconds(1.2))
+            check("a search can find several files", model.tab.items.contains { $0.name == "Notes.txt" })
+            model.tab.go(to: docs)
+            check("going to another folder ends the search", !model.tab.isSearching && model.tab.searchText.isEmpty)
+            try? await Task.sleep(for: .seconds(0.6))
+            check("and shows that folder", model.tab.items.contains { $0.name == "Work" })
+            model.tab.search("   ")
+            check("a search of only spaces does nothing", !model.tab.isSearching)
+            model.focusSearch()
+            check("Find asks for the Search box", model.searchFocusRequests > 0)
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)

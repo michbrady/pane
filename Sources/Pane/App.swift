@@ -49,6 +49,10 @@ struct PaneApp: App {
                     .keyboardShortcut(.delete, modifiers: .shift)
                     .disabled(model.tab.selection.isEmpty)
             }
+            CommandGroup(after: .textEditing) {
+                Button("Find") { model.focusSearch() }
+                    .keyboardShortcut("f")
+            }
             CommandGroup(replacing: .pasteboard) {
                 Button("Cut") { model.actions.cutSelection() }
                     .keyboardShortcut("x")
