@@ -163,6 +163,37 @@ enum SelfTest {
             check("Delete Immediately removes the item for good",
                   !fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path) && !fm.fileExists(atPath: trashDir.appending(path: "gone-a.txt").path))
 
+            // S-014 Undo file operations
+            let um = model.undoManager
+            for n in ["u1.txt", "u2.txt"] { try? Data(n.utf8).write(to: drop.appending(path: n)) }
+            model.go(to: docs)
+            model.go(to: drop)
+            try? await Task.sleep(for: .seconds(0.5))
+            pick("u1.txt")
+            model.trashSelection()
+            try? await Task.sleep(for: .seconds(1))
+            check("Edit > Undo names the action", um.undoMenuItemTitle == "Undo Move to Trash", um.undoMenuItemTitle)
+            um.undo()
+            try? await Task.sleep(for: .seconds(1))
+            check("Undo of Trash restores the original path", fm.fileExists(atPath: drop.appending(path: "u1.txt").path))
+            check("Edit > Redo names the action", um.redoMenuItemTitle == "Redo Move to Trash", um.redoMenuItemTitle)
+            um.redo()
+            try? await Task.sleep(for: .seconds(1))
+            check("Redo moves it to the Trash again", !fm.fileExists(atPath: drop.appending(path: "u1.txt").path))
+            um.undo()
+            try? await Task.sleep(for: .seconds(1))
+            check("Undo works again after Redo", fm.fileExists(atPath: drop.appending(path: "u1.txt").path))
+            pick("u2.txt")
+            model.cutSelection()
+            model.go(to: work)
+            try? await Task.sleep(for: .seconds(0.3))
+            model.paste()
+            try? await Task.sleep(for: .seconds(1))
+            check("a move registers an undo named for the move", um.undoMenuItemTitle.hasPrefix("Undo Move"), um.undoMenuItemTitle)
+            um.undo()
+            try? await Task.sleep(for: .seconds(1))
+            check("Undo of a move puts the item back", fm.fileExists(atPath: drop.appending(path: "u2.txt").path) && !fm.fileExists(atPath: work.appending(path: "u2.txt").path))
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

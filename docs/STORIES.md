@@ -187,7 +187,8 @@ Depends: S-013
 Acceptance:
 - [unit] Each operation registers its inverse. Undo of trash restores the original path.
 - [self] Edit menu names the action: "Undo Move 3 Items".
-Status: todo
+Note: Cmd-Z inside the Address bar uses the same Undo manager as file changes. Try typing a path, then Cmd-Z, by hand [manual].
+Status: done
 
 ### S-015 Rename with F2
 As the user, I press F2 (or click a selected name) and type a new name.

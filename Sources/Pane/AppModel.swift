@@ -3,6 +3,12 @@ import Foundation
 import Observation
 import PaneKit
 
+/// A record that Redo can update: a re-trashed item lands in a new place in the Trash.
+final class RecordBox: @unchecked Sendable {
+    var record: OperationRecord
+    init(_ record: OperationRecord) { self.record = record }
+}
+
 /// A pasted item whose name is already taken. `continuation` resumes the paste.
 struct PendingConflict {
     let conflict: Conflict
@@ -62,6 +68,11 @@ final class AppModel {
     private var pendingSelection: (index: Int, removed: Set<URL>)?
     /// A message for an alert, after something failed.
     var alertMessage: String?
+
+    /// The window's undo manager, set by ContentView. The Edit menu uses it.
+    var windowUndoManager: UndoManager?
+    private let fallbackUndoManager = UndoManager()
+    var undoManager: UndoManager { windowUndoManager ?? fallbackUndoManager }
 
     private let watcher = FolderWatcher()
     private var generation = 0
@@ -226,6 +237,7 @@ final class AppModel {
             progress = nil
             operationTask = nil
             report(result)
+            remember(result.record)
             reload()
         }
     }
@@ -291,6 +303,43 @@ final class AppModel {
     func hideProgressForSnapshot() {
         progressVisible = false
         progress = nil
+    }
+
+    // MARK: Undo
+
+    /// Keeps a finished change so Edit > Undo can reverse it, and Redo can do it again.
+    private func remember(_ record: OperationRecord) {
+        guard !record.isEmpty else { return }
+        registerUndo(RecordBox(record))
+    }
+
+    private func registerUndo(_ box: RecordBox) {
+        // Each change is its own Undo step. Without this, changes made in the same
+        // run loop pass share one group, and one Undo would reverse all of them.
+        if undoManager.groupingLevel > 0 { undoManager.endUndoGrouping() }
+        undoManager.beginUndoGrouping()
+        undoManager.registerUndo(withTarget: self) { model in model.performUndo(box) }
+        undoManager.setActionName(box.record.name)
+        undoManager.endUndoGrouping()
+    }
+
+    private func performUndo(_ box: RecordBox) {
+        // Registered while undoing, so it becomes the Redo.
+        undoManager.registerUndo(withTarget: self) { model in model.performRedo(box) }
+        undoManager.setActionName(box.record.name)
+        Task {
+            do { try await operations.undo(box.record) } catch { alertMessage = "Unable to undo. \(error.localizedDescription)" }
+            reload()
+        }
+    }
+
+    private func performRedo(_ box: RecordBox) {
+        undoManager.registerUndo(withTarget: self) { model in model.performUndo(box) }
+        undoManager.setActionName(box.record.name)
+        Task {
+            do { box.record = try await operations.redo(box.record) } catch { alertMessage = "Unable to redo. \(error.localizedDescription)" }
+            reload()
+        }
     }
 
     func cancelOperation() {

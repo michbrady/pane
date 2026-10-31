@@ -4,6 +4,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         NavigationSplitView {
@@ -15,6 +16,7 @@ struct ContentView: View {
         }
         .navigationTitle(model.currentName)
         .noInitialFocus()
+        .onChange(of: undoManager, initial: true) { _, manager in model.windowUndoManager = manager }
         .sheet(isPresented: .init(get: { model.progressVisible && model.pendingConflict == nil }, set: { _ in })) {
             OperationSheet()
         }
