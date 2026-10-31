@@ -197,7 +197,8 @@ Acceptance:
 - [self] The name field edits in place with the base name selected, not the extension.
 - [unit] A clashing name shows an error and keeps editing.
 - [self] Return does not rename. It opens (S-003) unless editing.
-Status: todo
+Note: F2 and the context menu start renaming. Click-a-selected-name is not built yet. Clicking away commits the rename.
+Status: done
 
 ### S-016 Create a new folder
 As the user, I press Cmd+Shift+N to add "New folder" and rename it right away.
@@ -205,7 +206,8 @@ Depends: S-015
 Acceptance:
 - [unit] Names go "New folder", "New folder (2)".
 - [self] The new row is selected and editing.
-Status: todo
+Note: New Folder is in the File menu. The toolbar New button stays dimmed until S-041.
+Status: done
 
 ### S-017 Drag files with Windows rules
 As the user, I drag files to move on the same volume and copy across volumes, with Option to copy and Cmd to move.

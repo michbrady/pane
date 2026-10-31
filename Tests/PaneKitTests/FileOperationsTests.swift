@@ -159,6 +159,14 @@ private func makeFS() -> InMemoryFileSystem {
     #expect(date == old)
 }
 
+@Test func renameSelectsTheNameButNotTheExtension() {
+    #expect(NameMaker.baseNameLength("report.final.pdf", isFolder: false) == 12)
+    #expect(NameMaker.baseNameLength("Photos", isFolder: true) == 6)
+    #expect(NameMaker.baseNameLength("v1.2", isFolder: true) == 4)
+    #expect(NameMaker.baseNameLength(".gitignore", isFolder: false) == 10)
+    #expect(NameMaker.baseNameLength("README", isFolder: false) == 6)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

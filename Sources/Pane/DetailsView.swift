@@ -13,10 +13,14 @@ struct DetailsView: View {
                     Image(nsImage: IconCache.icon(for: item.url, isFolder: item.isFolder))
                         .resizable()
                         .frame(width: Layout.rowIcon, height: Layout.rowIcon)
-                    Text(item.name)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(item.name)
+                    if model.renamingURL == item.url {
+                        RenameField(item: item)
+                    } else {
+                        Text(item.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(item.name)
+                    }
                 }
                 .opacity(model.isCut(item.url) ? Surfaces.cutOpacity : 1)
             }
@@ -40,6 +44,9 @@ struct DetailsView: View {
         .contextMenu(forSelectionType: URL.self) { urls in
             if !urls.isEmpty {
                 Button("Open") { model.open(Array(urls)) }
+                if urls.count == 1 {
+                    Button("Rename") { model.beginRename() }
+                }
             }
         } primaryAction: { urls in
             model.open(Array(urls))
@@ -100,5 +107,37 @@ enum Permissions {
     static func openFullDiskAccess() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
         NSWorkspace.shared.open(url)
+    }
+}
+
+/// The name field that replaces a row's name while renaming.
+private struct RenameField: View {
+    @Environment(AppModel.self) private var model
+    @FocusState private var focused: Bool
+    let item: FolderItem
+
+    var body: some View {
+        @Bindable var model = model
+        TextField("Name", text: $model.renameText)
+            .textFieldStyle(.plain)
+            .focused($focused)
+            .onSubmit { model.commitRename() }
+            .onExitCommand { model.cancelRename() }
+            .onChange(of: focused) { _, isFocused in
+                if !isFocused { model.commitRename(fromBlur: true) }
+            }
+            .popover(isPresented: .constant(model.renameError != nil), arrowEdge: .bottom) {
+                Label(model.renameError ?? "", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .padding(Space.md)
+            }
+            .onAppear {
+                focused = true
+                // Select the name but not the extension, so typing keeps ".pdf".
+                DispatchQueue.main.async {
+                    let length = NameMaker.baseNameLength(item.name, isFolder: item.isFolder)
+                    (NSApp.keyWindow?.firstResponder as? NSTextView)?.setSelectedRange(NSRange(location: 0, length: length))
+                }
+            }
     }
 }

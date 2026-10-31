@@ -32,6 +32,11 @@ struct PaneApp: App {
                 Button("Open") { model.openSelection() }
                     .keyboardShortcut(.downArrow, modifiers: .command)
                     .disabled(model.selection.isEmpty)
+                Button("New Folder") { model.newFolder() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                Button("Rename") { model.beginRename() }
+                    .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF2FunctionKey)!)), modifiers: [])
+                    .disabled(!model.canRename)
                 Divider()
                 Button("Move to Trash") { model.trashSelection() }
                     .keyboardShortcut(.delete, modifiers: .command)

@@ -194,6 +194,37 @@ enum SelfTest {
             try? await Task.sleep(for: .seconds(1))
             check("Undo of a move puts the item back", fm.fileExists(atPath: drop.appending(path: "u2.txt").path) && !fm.fileExists(atPath: work.appending(path: "u2.txt").path))
 
+            // S-015 Rename and S-016 New folder
+            model.go(to: docs)
+            model.go(to: drop)
+            try? await Task.sleep(for: .seconds(0.5))
+            model.newFolder()
+            try? await Task.sleep(for: .seconds(1))
+            check("New Folder makes \"New folder\"", fm.fileExists(atPath: drop.appending(path: "New folder").path))
+            check("the new folder is selected and being named", model.renamingURL?.lastPathComponent == "New folder", "\(String(describing: model.renamingURL))")
+            model.renameText = "Reports"
+            model.commitRename()
+            try? await Task.sleep(for: .seconds(1))
+            check("Return in the name field renames", fm.fileExists(atPath: drop.appending(path: "Reports").path) && !fm.fileExists(atPath: drop.appending(path: "New folder").path))
+            check("the renamed item is selected", model.selectedItems.first?.name == "Reports", "\(model.selectedItems.map(\.name))")
+            check("Edit > Undo names the rename", um.undoMenuItemTitle == "Undo Rename", um.undoMenuItemTitle)
+            um.undo()
+            try? await Task.sleep(for: .seconds(1))
+            check("Undo of a rename restores the old name", fm.fileExists(atPath: drop.appending(path: "New folder").path))
+            pick("Notes.txt")
+            model.beginRename()
+            check("Rename starts on a single selection", model.renamingURL != nil)
+            model.renameText = "file2.txt"
+            model.commitRename()
+            try? await Task.sleep(for: .seconds(0.5))
+            check("a taken name shows an error and keeps editing", model.renameError != nil && model.renamingURL != nil, model.renameError ?? "nil")
+            model.renameText = "  "
+            model.commitRename()
+            try? await Task.sleep(for: .seconds(0.5))
+            check("an empty name shows an error", model.renameError == "Give the item a name.", model.renameError ?? "nil")
+            model.cancelRename()
+            check("Escape stops renaming", model.renamingURL == nil)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

@@ -12,7 +12,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -20,6 +20,7 @@ enum Snapshot {
             model.hideProgressForSnapshot()
             model.hideConflictForSnapshot()
             model.pendingDelete = nil
+            model.cancelRename()
             switch self {
             case .window:
                 model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
@@ -39,7 +40,10 @@ enum Snapshot {
                 let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
                 model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "Budget 2026.xlsx")]
                 model.cutSelection()
-                model.selection = [docs.appending(path: "Trip itinerary.pdf")]
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    model.selection = Set(model.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
+                }
             case .conflict:
                 let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
                 model.go(to: docs.appending(path: "Work", directoryHint: .isDirectory))
@@ -50,6 +54,16 @@ enum Snapshot {
                 model.go(to: docs)
                 model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
                 model.askDeleteImmediately()
+            case .rename:
+                let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
+                model.go(to: docs)
+                // Wait for the listing, then choose and start naming, as a person pressing F2 would.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    model.selection = Set(model.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
+                    try? await Task.sleep(for: .milliseconds(200))
+                    model.beginRename()
+                }
             case .progress:
                 model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.showProgressForSnapshot()

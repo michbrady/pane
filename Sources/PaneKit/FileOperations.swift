@@ -266,3 +266,13 @@ public enum NameMaker {
         }
     }
 }
+
+public extension NameMaker {
+    /// How many characters of a name to select when renaming: everything but the
+    /// extension. A folder, or a name like ".gitignore", selects all of it.
+    static func baseNameLength(_ name: String, isFolder: Bool) -> Int {
+        let ext = (name as NSString).pathExtension
+        guard !isFolder, !ext.isEmpty, name.count > ext.count + 1 else { return name.count }
+        return name.count - ext.count - 1
+    }
+}

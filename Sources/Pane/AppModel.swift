@@ -66,6 +66,12 @@ final class AppModel {
     var pendingDelete: [URL]?
     /// After Trash, select the item that moved up into the gap.
     private var pendingSelection: (index: Int, removed: Set<URL>)?
+    // Rename
+    private(set) var renamingURL: URL?
+    var renameText = ""
+    private(set) var renameError: String?
+    /// Runs once after the next listing that includes the change.
+    private var afterReload: (() -> Void)?
     /// A message for an alert, after something failed.
     var alertMessage: String?
 
@@ -305,6 +311,75 @@ final class AppModel {
         progress = nil
     }
 
+    // MARK: Rename and new folder
+
+    var canRename: Bool { selection.count == 1 && editingText == nil }
+
+    func beginRename() {
+        guard canRename, let item = selectedItems.first else { return }
+        renameText = item.name
+        renameError = nil
+        renamingURL = item.url
+    }
+
+    func cancelRename() {
+        renamingURL = nil
+        renameError = nil
+    }
+
+    /// Return commits. Clicking away commits too, but never shows an error: it just stops.
+    func commitRename(fromBlur: Bool = false) {
+        guard let url = renamingURL, let item = items.first(where: { $0.url == url }) else { return }
+        if renameText == item.name { cancelRename(); return }
+        let text = renameText
+        Task {
+            do {
+                let record = try await operations.rename(url, to: text)
+                renamingURL = nil
+                renameError = nil
+                remember(record)
+                let renamed = url.deletingLastPathComponent().appending(path: text.trimmingCharacters(in: .whitespacesAndNewlines))
+                selectAfterReload(path: renamed.standardizedFileURL.path)
+                reload()
+            } catch let error as FileOperations.RenameError {
+                if fromBlur { cancelRename(); return }
+                switch error {
+                case .empty: renameError = "Give the item a name."
+                case .hasSlash: renameError = "A name cannot contain / or :."
+                case .taken: renameError = "An item with this name already exists."
+                }
+            } catch {
+                renameError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Cmd-Shift-N: make "New folder" and start naming it.
+    func newFolder() {
+        guard editingText == nil, operationTask == nil else { return }
+        let folder = currentFolder
+        Task {
+            do {
+                let (url, record) = try await operations.makeFolder(in: folder)
+                remember(record)
+                afterReload = { [self] in
+                    guard let item = items.first(where: { $0.url.standardizedFileURL.path == url.standardizedFileURL.path }) else { return }
+                    selection = [item.url]
+                    beginRename()
+                }
+                reload()
+            } catch {
+                alertMessage = "Unable to make a folder here. \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func selectAfterReload(path: String) {
+        afterReload = { [self] in
+            if let item = items.first(where: { $0.url.standardizedFileURL.path == path }) { selection = [item.url] }
+        }
+    }
+
     // MARK: Undo
 
     /// Keeps a finished change so Edit > Undo can reverse it, and Redo can do it again.
@@ -387,6 +462,14 @@ final class AppModel {
                     Task {
                         try? await Task.sleep(for: .milliseconds(80))
                         if currentFolder == folder { selection = [next] }
+                    }
+                }
+                if let action = afterReload {
+                    afterReload = nil
+                    // The Table drops its selection while it swaps rows, so act after it settles.
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(80))
+                        if currentFolder == folder { action() }
                     }
                 }
             case .failure:
