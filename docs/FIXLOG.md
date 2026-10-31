@@ -30,3 +30,9 @@ Symptom: found by the real drag. An Option-drop moved instead of copying.
 Cause: `performDrop` loaded the dropped files asynchronously and read the modifier keys afterwards, when Option could already be released.
 Fix: read `NSEvent.modifierFlags` at the instant of the drop and pass the keys to `drop(_:into:option:command:)`.
 Rule: read keyboard modifiers synchronously in the event callback, before any `await`.
+
+## Table cells and menus crashed on `@Environment(AppModel.self)` (S-023)
+Symptom: the app crashed with "No Observable object of type AppModel found" as soon as a folder opened.
+Cause: new views read the model from the SwiftUI environment, but Table cells and context menus are hosted outside it.
+Fix: `NameCell`, `RenameField`, and `ItemMenu` take the model as a plain property.
+Rule: a view that lives in a Table column or a menu gets its model passed in. Use `@Environment(AppModel.self)` only for views in the normal view tree.

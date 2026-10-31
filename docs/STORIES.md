@@ -256,7 +256,8 @@ Depends: S-002
 Acceptance:
 - [snap] Each mode has a snapshot.
 - [self] The status bar has toggle icons for Details and Icons.
-Status: todo
+Note: List shows names in one column. Icons selects with click, Command-click, and Shift-click, opens on double-click, and drags one item at a time. Try them by hand [manual].
+Status: done
 
 ### S-024 Show extensions and hidden files
 As the user, I turn on file extensions and hidden items from the View menu.

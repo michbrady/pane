@@ -2,10 +2,31 @@ import Foundation
 import Observation
 import PaneKit
 
+enum ViewMode: String, CaseIterable {
+    case details, list, icons
+
+    var title: String {
+        switch self {
+        case .details: "Details"
+        case .list: "List"
+        case .icons: "Icons"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .details: "list.bullet"
+        case .list: "list.dash"
+        case .icons: "square.grid.2x2"
+        }
+    }
+}
+
 /// How folders are shown, for every tab: the sort and whether folders come first.
 /// Saved between launches. Later stories add hidden files, extensions, and the view mode.
 @Observable
 final class ViewSettings {
+    var mode: ViewMode { didSet { changed() } }
     var sortKey: SortKey { didSet { changed() } }
     var ascending: Bool { didSet { changed() } }
     var foldersFirst: Bool { didSet { changed() } }
@@ -20,6 +41,7 @@ final class ViewSettings {
 
     init(defaults: UserDefaults = Prefs.defaults) {
         self.defaults = defaults
+        mode = ViewMode(rawValue: defaults.string(forKey: "view.mode") ?? "") ?? .details
         sortKey = SortKey(rawValue: defaults.string(forKey: "view.sortKey") ?? "") ?? .name
         ascending = defaults.object(forKey: "view.ascending") as? Bool ?? true
         foldersFirst = defaults.object(forKey: "view.foldersFirst") as? Bool ?? true
@@ -34,6 +56,7 @@ final class ViewSettings {
     }
 
     func reset() {
+        mode = .details
         sortKey = .name
         ascending = true
         foldersFirst = true
@@ -42,6 +65,7 @@ final class ViewSettings {
     }
 
     private func changed() {
+        defaults.set(mode.rawValue, forKey: "view.mode")
         defaults.set(sortKey.rawValue, forKey: "view.sortKey")
         defaults.set(ascending, forKey: "view.ascending")
         defaults.set(foldersFirst, forKey: "view.foldersFirst")

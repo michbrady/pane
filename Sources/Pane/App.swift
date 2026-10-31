@@ -57,6 +57,11 @@ struct PaneApp: App {
             }
             CommandGroup(after: .toolbar) {
                 Divider()
+                ForEach(Array(ViewMode.allCases.enumerated()), id: \.element) { index, mode in
+                    Toggle("As \(mode.title)", isOn: Binding(get: { model.view.mode == mode }, set: { _ in model.view.mode = mode }))
+                        .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: [.control, .command])
+                }
+                Divider()
                 Toggle("Show Hidden Items", isOn: Binding(get: { model.view.showHidden }, set: { model.view.showHidden = $0 }))
                     .keyboardShortcut(".", modifiers: [.command, .shift])
                 Toggle("Show File Extensions", isOn: Binding(get: { model.view.showExtensions }, set: { model.view.showExtensions = $0 }))

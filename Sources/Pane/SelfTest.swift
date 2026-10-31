@@ -341,6 +341,17 @@ enum SelfTest {
             model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
 
+            // S-023 Switch view mode
+            check("Details is the first view", model.view.mode == .details)
+            model.view.mode = .icons
+            check("the view mode is saved", ViewSettings().mode == .icons)
+            check("each mode has a name and an icon", ViewMode.allCases.allSatisfy { !$0.title.isEmpty && !$0.symbol.isEmpty })
+            model.tab.selection = Set(model.tab.items.prefix(1).map(\.url))
+            model.view.mode = .list
+            check("switching the view keeps the selection", model.tab.selection.count == 1)
+            model.view.reset()
+            check("reset returns to Details", model.view.mode == .details)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

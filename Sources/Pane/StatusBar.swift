@@ -10,6 +10,14 @@ struct StatusBar: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()
+            // The same choice as View > As Details and As Icons.
+            ForEach([ViewMode.details, ViewMode.icons], id: \.self) { mode in
+                Button(mode.title, systemImage: mode.symbol) { model.view.mode = mode }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(model.view.mode == mode ? Color.accentColor : .secondary)
+                    .help("Show items as \(mode.title.lowercased()) (⌃⌘\(mode == .details ? "1" : "3"))")
+            }
         }
         .padding(.horizontal, Space.md)
         .frame(height: Layout.statusBarHeight)

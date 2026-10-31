@@ -19,6 +19,9 @@ enum Layout {
     static let statusBarHeight: CGFloat = 24
     /// One row in Details and List view, and in the Navigation pane.
     static let rowHeight: CGFloat = 24
+    /// Icons view: one cell, and the icon in it.
+    static let iconCell: CGFloat = 96
+    static let gridIcon: CGFloat = 48
     /// Icon beside an item name in Details view.
     static let rowIcon: CGFloat = 16
     /// The conflict sheet and Properties panel.

@@ -63,7 +63,7 @@ struct FolderPage: View {
             Divider()
             AddressBar()
             Divider()
-            DetailsView()
+            FolderContent()
             Divider()
             StatusBar()
         }
