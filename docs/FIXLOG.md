@@ -23,4 +23,10 @@ Symptom: dropping onto folders in the Navigation pane worked in code, but draggi
 Cause: a SwiftUI `Table` row is a drag source only through `TableRow(...).draggable(...)`. The `dragContainer` I used alone adds no source.
 Fix: `Table(of:)` with `TableRow(item).draggable(item.url)`. A drag from this window uses the selected rows to choose move or copy.
 Rule: never mark a drag feature done from model-level tests alone. Prove the gesture with a real drag, with Pane frontmost.
-Status: fixed in code and builds. A real drag has not been run yet.
+Status: proven with `tools/drag-test.sh`, a real mouse drag: a row dropped on a tree folder moves, and Option-drop copies.
+
+## Option was read after the files loaded (S-017)
+Symptom: found by the real drag. An Option-drop moved instead of copying.
+Cause: `performDrop` loaded the dropped files asynchronously and read the modifier keys afterwards, when Option could already be released.
+Fix: read `NSEvent.modifierFlags` at the instant of the drop and pass the keys to `drop(_:into:option:command:)`.
+Rule: read keyboard modifiers synchronously in the event callback, before any `await`.

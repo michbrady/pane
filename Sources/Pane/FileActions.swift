@@ -110,16 +110,9 @@ final class FileActions {
         return DropRules.mode(sameVolume: same, option: keys.contains(.option), command: keys.contains(.command))
     }
 
-    func drop(_ urls: [URL], into folder: URL) {
-        let mode = DropRules.mode(
-            sameVolume: DropRules.sameVolume(urls, as: folder),
-            option: NSEvent.modifierFlags.contains(.option), command: NSEvent.modifierFlags.contains(.command))
-        dragSources = []
-        startPaste(urls, into: folder, mode: mode, clearsCut: false)
-    }
-
-    /// For tests: a drop with the keys held chosen by the caller.
+    /// Move or copy, with the keys that were held at the moment of the drop.
     func drop(_ urls: [URL], into folder: URL, option: Bool, command: Bool) {
+        dragSources = []
         let mode = DropRules.mode(sameVolume: DropRules.sameVolume(urls, as: folder), option: option, command: command)
         startPaste(urls, into: folder, mode: mode, clearsCut: false)
     }

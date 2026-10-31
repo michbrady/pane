@@ -18,12 +18,15 @@ struct FileDropDelegate: DropDelegate {
     func performDrop(info: DropInfo) -> Bool {
         let providers = info.itemProviders(for: [.fileURL])
         guard !providers.isEmpty else { return false }
+        // Read the keys now: loading the files takes a moment, and Option may be let go by then.
+        let keys = NSEvent.modifierFlags
+        let option = keys.contains(.option), command = keys.contains(.command)
         Task {
             var urls: [URL] = []
             for provider in providers {
                 if let url = await provider.fileURL() { urls.append(url) }
             }
-            model.actions.drop(urls, into: folder)
+            model.actions.drop(urls, into: folder, option: option, command: command)
         }
         return true
     }
