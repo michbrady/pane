@@ -16,24 +16,24 @@ struct ContentView: View {
         }
         .navigationTitle(model.tab.currentName)
         .noInitialFocus()
-        .onChange(of: undoManager, initial: true) { _, manager in model.windowUndoManager = manager }
-        .sheet(isPresented: .init(get: { model.progressVisible && model.pendingConflict == nil }, set: { _ in })) {
+        .onChange(of: undoManager, initial: true) { _, manager in model.actions.windowUndoManager = manager }
+        .sheet(isPresented: .init(get: { model.actions.progressVisible && model.actions.pendingConflict == nil }, set: { _ in })) {
             OperationSheet()
         }
-        .sheet(isPresented: .init(get: { model.pendingConflict != nil }, set: { _ in })) {
+        .sheet(isPresented: .init(get: { model.actions.pendingConflict != nil }, set: { _ in })) {
             ConflictSheet()
         }
-        .confirmationDialog(deleteTitle, isPresented: .init(get: { model.pendingDelete != nil }, set: { if !$0 { model.pendingDelete = nil } }),
+        .confirmationDialog(deleteTitle, isPresented: .init(get: { model.actions.pendingDelete != nil }, set: { if !$0 { model.actions.pendingDelete = nil } }),
                             titleVisibility: .visible) {
-            Button("Delete Immediately", role: .destructive) { model.deleteImmediately() }
-            Button("Cancel", role: .cancel) { model.pendingDelete = nil }
+            Button("Delete Immediately", role: .destructive) { model.actions.deleteImmediately() }
+            Button("Cancel", role: .cancel) { model.actions.pendingDelete = nil }
         } message: {
             Text("This cannot be undone.")
         }
-        .alert("Pane", isPresented: .init(get: { model.alertMessage != nil }, set: { if !$0 { model.alertMessage = nil } })) {
+        .alert("Pane", isPresented: .init(get: { model.actions.alertMessage != nil }, set: { if !$0 { model.actions.alertMessage = nil } })) {
             Button("OK") {}
         } message: {
-            Text(model.alertMessage ?? "")
+            Text(model.actions.alertMessage ?? "")
         }
         .background(FrameAutosave(name: "PaneMain"))
         .task {
@@ -45,7 +45,7 @@ struct ContentView: View {
 
 extension ContentView {
     fileprivate var deleteTitle: String {
-        guard let urls = model.pendingDelete else { return "" }
+        guard let urls = model.actions.pendingDelete else { return "" }
         return urls.count == 1
             ? "Delete \u{201C}\(urls[0].lastPathComponent)\u{201D} Immediately?"
             : "Delete \(urls.count) Items Immediately?"
@@ -124,7 +124,7 @@ struct OperationSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.md) {
             Text(title).font(.headline)
-            if let p = model.progress {
+            if let p = model.actions.progress {
                 ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
                 Text(p.current).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             } else {
@@ -132,7 +132,7 @@ struct OperationSheet: View {
             }
             HStack {
                 Spacer()
-                Button("Cancel") { model.cancelOperation() }
+                Button("Cancel") { model.actions.cancelOperation() }
                     .keyboardShortcut(.cancelAction)
             }
         }
@@ -142,8 +142,8 @@ struct OperationSheet: View {
     }
 
     private var title: String {
-        guard let p = model.progress else { return model.progressTitle + "…" }
-        return "\(model.progressTitle) \(min(p.done + 1, p.total)) of \(p.total)"
+        guard let p = model.actions.progress else { return model.actions.progressTitle + "…" }
+        return "\(model.actions.progressTitle) \(min(p.done + 1, p.total)) of \(p.total)"
     }
 }
 
@@ -153,7 +153,7 @@ struct ConflictSheet: View {
     @State private var applyToAll = false
 
     var body: some View {
-        if let pending = model.pendingConflict {
+        if let pending = model.actions.pendingConflict {
             VStack(alignment: .leading, spacing: Space.lg) {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     Text("\u{201C}\(pending.conflict.existing.lastPathComponent)\u{201D} already exists")
@@ -167,13 +167,13 @@ struct ConflictSheet: View {
                 }
                 Toggle("Do this for all conflicts", isOn: $applyToAll)
                 HStack {
-                    Button("Cancel") { model.resolveConflict(.cancel, applyToAll: false) }
+                    Button("Cancel") { model.actions.resolveConflict(.cancel, applyToAll: false) }
                         .keyboardShortcut(.cancelAction)
                     Spacer()
-                    Button("Keep Both") { model.resolveConflict(.keepBoth, applyToAll: applyToAll) }
-                    Button("Replace") { model.resolveConflict(.replace, applyToAll: applyToAll) }
+                    Button("Keep Both") { model.actions.resolveConflict(.keepBoth, applyToAll: applyToAll) }
+                    Button("Replace") { model.actions.resolveConflict(.replace, applyToAll: applyToAll) }
                     // Skip is the default, so a stray Return never overwrites anything.
-                    Button("Skip") { model.resolveConflict(.skip, applyToAll: applyToAll) }
+                    Button("Skip") { model.actions.resolveConflict(.skip, applyToAll: applyToAll) }
                         .keyboardShortcut(.defaultAction)
                 }
             }

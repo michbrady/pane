@@ -75,9 +75,9 @@ enum SelfTest {
             try? await Task.sleep(for: .seconds(0.3))
             let notes = docs.appending(path: "Notes.txt")
             model.tab.selection = [notes]
-            model.copySelection()
+            model.actions.copySelection()
             model.tab.go(to: work)
-            model.paste()
+            model.actions.paste()
             try? await Task.sleep(for: .seconds(1))
             check("Paste copies the item here", fm.fileExists(atPath: work.appending(path: "Notes.txt").path))
             check("Copy keeps the original", fm.fileExists(atPath: notes.path))
@@ -90,25 +90,25 @@ enum SelfTest {
             model.tab.go(to: work)
             try? await Task.sleep(for: .seconds(0.4))
             model.tab.selection = [moveMe]
-            model.cutSelection()
-            check("Cut leaves the item in place", fm.fileExists(atPath: moveMe.path) && model.isCut(moveMe))
+            model.actions.cutSelection()
+            check("Cut leaves the item in place", fm.fileExists(atPath: moveMe.path) && model.actions.isCut(moveMe))
             model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
             check("Cut items stay until paste", fm.fileExists(atPath: moveMe.path))
-            model.paste()
+            model.actions.paste()
             try? await Task.sleep(for: .seconds(1))
             check("Paste moves the item", fm.fileExists(atPath: docs.appending(path: "Move me.txt").path) && !fm.fileExists(atPath: moveMe.path))
-            check("Paste clears the cut", !model.isCut(moveMe))
+            check("Paste clears the cut", !model.actions.isCut(moveMe))
             let again = docs.appending(path: "Move me.txt")
             model.tab.selection = [again]
-            model.cutSelection()
-            model.clearCut()
-            check("Escape clears the cut", !model.isCut(again))
+            model.actions.cutSelection()
+            model.actions.clearCut()
+            check("Escape clears the cut", !model.actions.isCut(again))
             model.tab.selection = [again]
-            model.cutSelection()
+            model.actions.cutSelection()
             model.tab.selection = [docs.appending(path: "Notes.txt")]
-            model.copySelection()
-            check("Copying something else clears the cut", !model.isCut(again))
+            model.actions.copySelection()
+            check("Copying something else clears the cut", !model.actions.isCut(again))
 
             // S-012 Resolve name conflicts
             let drop = home.appending(path: "Conflicts", directoryHint: .isDirectory)
@@ -118,25 +118,25 @@ enum SelfTest {
             model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
             model.tab.selection = [docs.appending(path: "Notes.txt")]
-            model.copySelection()
+            model.actions.copySelection()
             model.tab.go(to: drop)
-            model.paste()
+            model.actions.paste()
             try? await Task.sleep(for: .seconds(0.5))
-            check("a name conflict asks first", model.pendingConflict != nil)
-            model.resolveConflict(.skip, applyToAll: false)
+            check("a name conflict asks first", model.actions.pendingConflict != nil)
+            model.actions.resolveConflict(.skip, applyToAll: false)
             try? await Task.sleep(for: .seconds(0.5))
             check("Skip leaves the existing file untouched",
                   (try? String(contentsOf: drop.appending(path: "Notes.txt"), encoding: .utf8)) == "old")
             model.tab.go(to: docs)
             try? await Task.sleep(for: .seconds(0.3))
             model.tab.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
-            model.copySelection()
+            model.actions.copySelection()
             model.tab.go(to: drop)
-            model.paste()
+            model.actions.paste()
             try? await Task.sleep(for: .seconds(0.5))
-            model.resolveConflict(.keepBoth, applyToAll: true)
+            model.actions.resolveConflict(.keepBoth, applyToAll: true)
             try? await Task.sleep(for: .seconds(0.8))
-            check("Do this for all asks once", model.pendingConflict == nil)
+            check("Do this for all asks once", model.actions.pendingConflict == nil)
             check("Keep Both adds a numbered copy",
                   fm.fileExists(atPath: drop.appending(path: "Notes (2).txt").path)
                   && fm.fileExists(atPath: drop.appending(path: "file2 (2).txt").path))
@@ -150,27 +150,27 @@ enum SelfTest {
             // Select from the listing, as a click does: listed URLs can spell /tmp as /private/tmp.
             @MainActor func pick(_ names: String...) { model.tab.selection = Set(model.tab.items.filter { names.contains($0.name) }.map(\.url)) }
             pick("gone-b.txt")
-            model.trashSelection()
+            model.actions.trashSelection()
             try? await Task.sleep(for: .seconds(1))
             check("Move to Trash removes the item from the folder", !fm.fileExists(atPath: drop.appending(path: "gone-b.txt").path))
             check("the item is in the Trash", fm.fileExists(atPath: trashDir.appending(path: "gone-b.txt").path))
             check("selection moves to the next item", model.tab.selection == [model.tab.items[min(firstGone, model.tab.items.count - 1)].url], "selection \(model.tab.selection) items \(model.tab.items.map(\.name)) first \(firstGone)")
             pick("gone-a.txt")
-            model.askDeleteImmediately()
-            check("Delete Immediately asks first", model.pendingDelete != nil && fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path))
-            model.deleteImmediately()
+            model.actions.askDeleteImmediately()
+            check("Delete Immediately asks first", model.actions.pendingDelete != nil && fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path))
+            model.actions.deleteImmediately()
             try? await Task.sleep(for: .seconds(1))
             check("Delete Immediately removes the item for good",
                   !fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path) && !fm.fileExists(atPath: trashDir.appending(path: "gone-a.txt").path))
 
             // S-014 Undo file operations
-            let um = model.undoManager
+            let um = model.actions.undoManager
             for n in ["u1.txt", "u2.txt"] { try? Data(n.utf8).write(to: drop.appending(path: n)) }
             model.tab.go(to: docs)
             model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.5))
             pick("u1.txt")
-            model.trashSelection()
+            model.actions.trashSelection()
             try? await Task.sleep(for: .seconds(1))
             check("Edit > Undo names the action", um.undoMenuItemTitle == "Undo Move to Trash", um.undoMenuItemTitle)
             um.undo()
@@ -184,10 +184,10 @@ enum SelfTest {
             try? await Task.sleep(for: .seconds(1))
             check("Undo works again after Redo", fm.fileExists(atPath: drop.appending(path: "u1.txt").path))
             pick("u2.txt")
-            model.cutSelection()
+            model.actions.cutSelection()
             model.tab.go(to: work)
             try? await Task.sleep(for: .seconds(0.3))
-            model.paste()
+            model.actions.paste()
             try? await Task.sleep(for: .seconds(1))
             check("a move registers an undo named for the move", um.undoMenuItemTitle.hasPrefix("Undo Move"), um.undoMenuItemTitle)
             um.undo()
@@ -198,12 +198,12 @@ enum SelfTest {
             model.tab.go(to: docs)
             model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.5))
-            model.newFolder()
+            model.actions.newFolder()
             try? await Task.sleep(for: .seconds(1))
             check("New Folder makes \"New folder\"", fm.fileExists(atPath: drop.appending(path: "New folder").path))
-            check("the new folder is selected and being named", model.renamingURL?.lastPathComponent == "New folder", "\(String(describing: model.renamingURL))")
-            model.renameText = "Reports"
-            model.commitRename()
+            check("the new folder is selected and being named", model.actions.renamingURL?.lastPathComponent == "New folder", "\(String(describing: model.actions.renamingURL))")
+            model.actions.renameText = "Reports"
+            model.actions.commitRename()
             try? await Task.sleep(for: .seconds(1))
             check("Return in the name field renames", fm.fileExists(atPath: drop.appending(path: "Reports").path) && !fm.fileExists(atPath: drop.appending(path: "New folder").path))
             check("the renamed item is selected", model.tab.selectedItems.first?.name == "Reports", "\(model.tab.selectedItems.map(\.name))")
@@ -212,18 +212,18 @@ enum SelfTest {
             try? await Task.sleep(for: .seconds(1))
             check("Undo of a rename restores the old name", fm.fileExists(atPath: drop.appending(path: "New folder").path))
             pick("Notes.txt")
-            model.beginRename()
-            check("Rename starts on a single selection", model.renamingURL != nil)
-            model.renameText = "file2.txt"
-            model.commitRename()
+            model.actions.beginRename()
+            check("Rename starts on a single selection", model.actions.renamingURL != nil)
+            model.actions.renameText = "file2.txt"
+            model.actions.commitRename()
             try? await Task.sleep(for: .seconds(0.5))
-            check("a taken name shows an error and keeps editing", model.renameError != nil && model.renamingURL != nil, model.renameError ?? "nil")
-            model.renameText = "  "
-            model.commitRename()
+            check("a taken name shows an error and keeps editing", model.actions.renameError != nil && model.actions.renamingURL != nil, model.actions.renameError ?? "nil")
+            model.actions.renameText = "  "
+            model.actions.commitRename()
             try? await Task.sleep(for: .seconds(0.5))
-            check("an empty name shows an error", model.renameError == "Give the item a name.", model.renameError ?? "nil")
-            model.cancelRename()
-            check("Escape stops renaming", model.renamingURL == nil)
+            check("an empty name shows an error", model.actions.renameError == "Give the item a name.", model.actions.renameError ?? "nil")
+            model.actions.cancelRename()
+            check("Escape stops renaming", model.actions.renamingURL == nil)
 
             // S-017 Drag files with Windows rules
             let dest = drop.appending(path: "Dest", directoryHint: .isDirectory)
@@ -233,22 +233,22 @@ enum SelfTest {
             model.tab.go(to: drop)
             try? await Task.sleep(for: .seconds(0.5))
             @MainActor func listed(_ name: String) -> URL { model.tab.items.first { $0.name == name }!.url }
-            model.dragStarted([listed("d3.txt")])
-            check("a drag inside one volume moves", model.dropMode(into: dest) == .move)
-            model.dragStarted([])
-            check("a drag from another app copies until it lands", model.dropMode(into: dest) == .copy)
-            model.drop([listed("d1.txt")], into: dest, option: false, command: false)
+            model.actions.dragStarted([listed("d3.txt")])
+            check("a drag inside one volume moves", model.actions.dropMode(into: dest) == .move)
+            model.actions.dragStarted([])
+            check("a drag from another app copies until it lands", model.actions.dropMode(into: dest) == .copy)
+            model.actions.drop([listed("d1.txt")], into: dest, option: false, command: false)
             try? await Task.sleep(for: .seconds(1))
             check("dropping with no key moves on the same volume",
                   fm.fileExists(atPath: dest.appending(path: "d1.txt").path) && !fm.fileExists(atPath: drop.appending(path: "d1.txt").path))
-            model.drop([listed("d2.txt")], into: dest, option: true, command: false)
+            model.actions.drop([listed("d2.txt")], into: dest, option: true, command: false)
             try? await Task.sleep(for: .seconds(1))
             check("dropping with Option copies",
                   fm.fileExists(atPath: dest.appending(path: "d2.txt").path) && fm.fileExists(atPath: drop.appending(path: "d2.txt").path))
-            model.drop([dest], into: dest, option: false, command: false)
+            model.actions.drop([dest], into: dest, option: false, command: false)
             try? await Task.sleep(for: .seconds(1))
-            check("a folder dropped on itself is refused with a message", model.alertMessage?.contains("cannot go inside itself") == true, model.alertMessage ?? "nil")
-            model.alertMessage = nil
+            check("a folder dropped on itself is refused with a message", model.actions.alertMessage?.contains("cannot go inside itself") == true, model.actions.alertMessage ?? "nil")
+            model.actions.alertMessage = nil
             check("a drop registers an undo", um.undoMenuItemTitle.hasPrefix("Undo Copy") || um.undoMenuItemTitle.hasPrefix("Undo Move"), um.undoMenuItemTitle)
 
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")

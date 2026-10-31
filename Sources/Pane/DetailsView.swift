@@ -13,7 +13,7 @@ struct DetailsView: View {
                     Image(nsImage: IconCache.icon(for: item.url, isFolder: item.isFolder))
                         .resizable()
                         .frame(width: Layout.rowIcon, height: Layout.rowIcon)
-                    if model.renamingURL == item.url {
+                    if model.actions.renamingURL == item.url {
                         RenameField(item: item)
                     } else {
                         Text(item.name)
@@ -22,7 +22,7 @@ struct DetailsView: View {
                             .help(item.name)
                     }
                 }
-                .opacity(model.isCut(item.url) ? Surfaces.cutOpacity : 1)
+                .opacity(model.actions.isCut(item.url) ? Surfaces.cutOpacity : 1)
             }
             .width(min: 160, ideal: 280)
             TableColumn("Date modified") { item in
@@ -43,7 +43,7 @@ struct DetailsView: View {
         }
         // Dragging a selected row drags the whole selection, to Finder or to a folder in Pane.
         .dragContainer(for: URL.self, itemID: \.self) { urls in
-            model.dragStarted(urls)
+            model.actions.dragStarted(urls)
             return urls
         }
         // Dropping on empty space drops into the folder being shown.
@@ -52,7 +52,7 @@ struct DetailsView: View {
             if !urls.isEmpty {
                 Button("Open") { model.tab.open(Array(urls)) }
                 if urls.count == 1 {
-                    Button("Rename") { model.beginRename() }
+                    Button("Rename") { model.actions.beginRename() }
                 }
             }
         } primaryAction: { urls in
@@ -65,16 +65,16 @@ struct DetailsView: View {
         }
         .onKeyPress(.delete) {
             guard !model.tab.selection.isEmpty else { return .ignored }
-            model.trashSelection()
+            model.actions.trashSelection()
             return .handled
         }
         .onKeyPress(.deleteForward) {
             guard !model.tab.selection.isEmpty else { return .ignored }
-            model.trashSelection()
+            model.actions.trashSelection()
             return .handled
         }
         .onKeyPress(.escape) {
-            model.clearCut()
+            model.actions.clearCut()
             return .handled
         }
         .alternatingRowBackgrounds(.disabled)
@@ -124,17 +124,17 @@ private struct RenameField: View {
     let item: FolderItem
 
     var body: some View {
-        @Bindable var model = model
-        TextField("Name", text: $model.renameText)
+        @Bindable var actions = model.actions
+        TextField("Name", text: $actions.renameText)
             .textFieldStyle(.plain)
             .focused($focused)
-            .onSubmit { model.commitRename() }
-            .onExitCommand { model.cancelRename() }
+            .onSubmit { model.actions.commitRename() }
+            .onExitCommand { model.actions.cancelRename() }
             .onChange(of: focused) { _, isFocused in
-                if !isFocused { model.commitRename(fromBlur: true) }
+                if !isFocused { model.actions.commitRename(fromBlur: true) }
             }
-            .popover(isPresented: .constant(model.renameError != nil), arrowEdge: .bottom) {
-                Label(model.renameError ?? "", systemImage: "exclamationmark.triangle.fill")
+            .popover(isPresented: .constant(model.actions.renameError != nil), arrowEdge: .bottom) {
+                Label(model.actions.renameError ?? "", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
                     .padding(Space.md)
             }

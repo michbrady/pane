@@ -12,7 +12,7 @@ struct FileDropDelegate: DropDelegate {
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: model.dropMode(into: folder) == .copy ? .copy : .move)
+        DropProposal(operation: model.actions.dropMode(into: folder) == .copy ? .copy : .move)
     }
 
     func performDrop(info: DropInfo) -> Bool {
@@ -23,7 +23,7 @@ struct FileDropDelegate: DropDelegate {
             for provider in providers {
                 if let url = await provider.fileURL() { urls.append(url) }
             }
-            model.drop(urls, into: folder)
+            model.actions.drop(urls, into: folder)
         }
         return true
     }

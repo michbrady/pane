@@ -32,27 +32,27 @@ struct PaneApp: App {
                 Button("Open") { model.tab.openSelection() }
                     .keyboardShortcut(.downArrow, modifiers: .command)
                     .disabled(model.tab.selection.isEmpty)
-                Button("New Folder") { model.newFolder() }
+                Button("New Folder") { model.actions.newFolder() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
-                Button("Rename") { model.beginRename() }
+                Button("Rename") { model.actions.beginRename() }
                     .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF2FunctionKey)!)), modifiers: [])
-                    .disabled(!model.canRename)
+                    .disabled(!model.actions.canRename)
                 Divider()
-                Button("Move to Trash") { model.trashSelection() }
+                Button("Move to Trash") { model.actions.trashSelection() }
                     .keyboardShortcut(.delete, modifiers: .command)
                     .disabled(model.tab.selection.isEmpty)
-                Button("Delete Immediately…") { model.askDeleteImmediately() }
+                Button("Delete Immediately…") { model.actions.askDeleteImmediately() }
                     .keyboardShortcut(.delete, modifiers: .shift)
                     .disabled(model.tab.selection.isEmpty)
             }
             CommandGroup(replacing: .pasteboard) {
-                Button("Cut") { model.cutSelection() }
+                Button("Cut") { model.actions.cutSelection() }
                     .keyboardShortcut("x")
                     .disabled(!model.canCopy)
-                Button("Copy") { model.copySelection() }
+                Button("Copy") { model.actions.copySelection() }
                     .keyboardShortcut("c")
                     .disabled(!model.canCopy)
-                Button("Paste") { model.paste() }
+                Button("Paste") { model.actions.paste() }
                     .keyboardShortcut("v")
             }
             CommandMenu("Go") {
