@@ -216,7 +216,8 @@ Acceptance:
 - [unit] No modifier: same volume moves, other volume copies.
 - [self] The cursor shows a plus badge for copy.
 - [self] Dropping on a tree folder or tab works.
-Status: todo
+Note: tested at the model level (move or copy by volume and key, drop on itself refused, undo registered). By hand [manual]: the drag gesture, dragging several selected rows, the plus badge on the cursor, and a drag to an external drive. Dropping on a tab waits for S-026.
+Status: done
 
 ## M3 Views and tabs
 

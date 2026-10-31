@@ -167,6 +167,23 @@ private func makeFS() -> InMemoryFileSystem {
     #expect(NameMaker.baseNameLength("README", isFolder: false) == 6)
 }
 
+@Test func dragRulesFollowVolumeAndModifierKeys() {
+    #expect(DropRules.mode(sameVolume: true, option: false, command: false) == .move)
+    #expect(DropRules.mode(sameVolume: false, option: false, command: false) == .copy)
+    #expect(DropRules.mode(sameVolume: true, option: true, command: false) == .copy)
+    #expect(DropRules.mode(sameVolume: false, option: false, command: true) == .move)
+    #expect(DropRules.mode(sameVolume: false, option: true, command: true) == .copy)
+}
+
+@Test func sameVolumeIsTrueInsideOneFolderTree() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-vol-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root.appending(path: "a"), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: root.appending(path: "b"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    #expect(DropRules.sameVolume([root.appending(path: "a")], as: root.appending(path: "b")))
+    #expect(!DropRules.sameVolume([root.appending(path: "missing")], as: root.appending(path: "b")))
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

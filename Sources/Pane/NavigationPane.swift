@@ -46,6 +46,7 @@ private struct NavRow: View {
                 .frame(width: Layout.rowIcon, height: Layout.rowIcon)
         }
         .tag(node.id)
+        .acceptsFileDrops(into: node.url, model: model)
         .help("Show folders inside \(node.name)")
     }
 

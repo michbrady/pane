@@ -59,6 +59,7 @@ private struct BreadcrumbTrail: View {
                     Button(Locations.displayName(for: url)) { model.go(to: url) }
                         .buttonStyle(.plain)
                         .padding(.horizontal, Space.xs)
+                        .acceptsFileDrops(into: url, model: model)
                         .help("Go to \(Locations.displayName(for: url))")
                     SiblingsMenu(folder: url)
                 }

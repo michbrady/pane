@@ -215,15 +215,50 @@ final class AppModel {
         if let text = editingText { text.paste(nil); return }
         let sources = clipboard.urls
         guard !sources.isEmpty, operationTask == nil else { return }
-        let mode: PasteMode = clipboard.isCutActive ? .move : .copy
+        startPaste(sources, into: currentFolder, mode: clipboard.isCutActive ? .move : .copy, clearsCut: clipboard.isCutActive)
+    }
+
+    private func startPaste(_ sources: [URL], into folder: URL, mode: PasteMode, clearsCut: Bool) {
+        guard !sources.isEmpty, operationTask == nil else { return }
         run(title: mode == .copy ? "Copying" : "Moving") { [self] in
-            await operations.paste(sources, into: currentFolder, mode: mode,
+            await operations.paste(sources, into: folder, mode: mode,
                                    resolve: { [self] conflict in await askConflict(conflict) },
                                    progress: { p in Task { @MainActor in self.progress = p } })
         } finished: { [self] result in
-            if mode == .move { clipboard.clearCut() }
+            if clearsCut { clipboard.clearCut() }
             return result
         }
+    }
+
+    // MARK: Drag and drop
+
+    /// The items being dragged out of this window, so a hover can tell move from copy.
+    private(set) var dragSources: [URL] = []
+
+    func dragStarted(_ urls: [URL]) {
+        dragSources = urls
+    }
+
+    /// Move or copy, from the volumes and the Option and Command keys held right now.
+    func dropMode(into folder: URL) -> PasteMode {
+        let keys = NSEvent.modifierFlags
+        // A drag from another app has unknown sources until it lands, so it copies.
+        let same = !dragSources.isEmpty && DropRules.sameVolume(dragSources, as: folder)
+        return DropRules.mode(sameVolume: same, option: keys.contains(.option), command: keys.contains(.command))
+    }
+
+    func drop(_ urls: [URL], into folder: URL) {
+        let mode = DropRules.mode(
+            sameVolume: DropRules.sameVolume(urls, as: folder),
+            option: NSEvent.modifierFlags.contains(.option), command: NSEvent.modifierFlags.contains(.command))
+        dragSources = []
+        startPaste(urls, into: folder, mode: mode, clearsCut: false)
+    }
+
+    /// For tests: a drop with the keys held chosen by the caller.
+    func drop(_ urls: [URL], into folder: URL, option: Bool, command: Bool) {
+        let mode = DropRules.mode(sameVolume: DropRules.sameVolume(urls, as: folder), option: option, command: command)
+        startPaste(urls, into: folder, mode: mode, clearsCut: false)
     }
 
     /// Runs an operation in the background. The progress sheet shows after one second.

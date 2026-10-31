@@ -41,6 +41,13 @@ struct DetailsView: View {
             }
             .width(min: 60, ideal: 80)
         }
+        // Dragging a selected row drags the whole selection, to Finder or to a folder in Pane.
+        .dragContainer(for: URL.self, itemID: \.self) { urls in
+            model.dragStarted(urls)
+            return urls
+        }
+        // Dropping on empty space drops into the folder being shown.
+        .acceptsFileDrops(into: model.currentFolder, model: model)
         .contextMenu(forSelectionType: URL.self) { urls in
             if !urls.isEmpty {
                 Button("Open") { model.open(Array(urls)) }

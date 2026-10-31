@@ -225,6 +225,32 @@ enum SelfTest {
             model.cancelRename()
             check("Escape stops renaming", model.renamingURL == nil)
 
+            // S-017 Drag files with Windows rules
+            let dest = drop.appending(path: "Dest", directoryHint: .isDirectory)
+            try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
+            for n in ["d1.txt", "d2.txt", "d3.txt"] { try? Data(n.utf8).write(to: drop.appending(path: n)) }
+            model.go(to: docs)
+            model.go(to: drop)
+            try? await Task.sleep(for: .seconds(0.5))
+            @MainActor func listed(_ name: String) -> URL { model.items.first { $0.name == name }!.url }
+            model.dragStarted([listed("d3.txt")])
+            check("a drag inside one volume moves", model.dropMode(into: dest) == .move)
+            model.dragStarted([])
+            check("a drag from another app copies until it lands", model.dropMode(into: dest) == .copy)
+            model.drop([listed("d1.txt")], into: dest, option: false, command: false)
+            try? await Task.sleep(for: .seconds(1))
+            check("dropping with no key moves on the same volume",
+                  fm.fileExists(atPath: dest.appending(path: "d1.txt").path) && !fm.fileExists(atPath: drop.appending(path: "d1.txt").path))
+            model.drop([listed("d2.txt")], into: dest, option: true, command: false)
+            try? await Task.sleep(for: .seconds(1))
+            check("dropping with Option copies",
+                  fm.fileExists(atPath: dest.appending(path: "d2.txt").path) && fm.fileExists(atPath: drop.appending(path: "d2.txt").path))
+            model.drop([dest], into: dest, option: false, command: false)
+            try? await Task.sleep(for: .seconds(1))
+            check("a folder dropped on itself is refused with a message", model.alertMessage?.contains("cannot go inside itself") == true, model.alertMessage ?? "nil")
+            model.alertMessage = nil
+            check("a drop registers an undo", um.undoMenuItemTitle.hasPrefix("Undo Copy") || um.undoMenuItemTitle.hasPrefix("Undo Move"), um.undoMenuItemTitle)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }
