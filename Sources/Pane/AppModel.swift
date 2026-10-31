@@ -7,7 +7,10 @@ import PaneKit
 @Observable
 final class AppModel {
     let view = ViewSettings()
-    let tab: FolderTab
+    /// The open tabs. Each is one folder with its own history, listing, and selection.
+    private(set) var tabs: [FolderTab] = []
+    private(set) var activeIndex = 0
+    var tab: FolderTab { tabs[activeIndex] }
     let actions = FileActions()
 
     // Navigation pane
@@ -42,26 +45,88 @@ final class AppModel {
         expanded = Set(defaults.stringArray(forKey: "pane.expanded") ?? [])
 
         let env = ProcessInfo.processInfo.environment
-        var start = Locations.home.appending(path: "Downloads", directoryHint: .isDirectory)
+        var starts: [URL] = []
+        var active = 0
         if let path = env["APP_START"], !path.isEmpty {
-            start = URL(fileURLWithPath: path)
-        } else if defaults.object(forKey: "reopenLastFolder") as? Bool ?? true,
-                  let saved = defaults.string(forKey: "pane.folder"),
-                  FileManager.default.fileExists(atPath: saved) {
-            start = URL(fileURLWithPath: saved)
-        } else if !FileManager.default.fileExists(atPath: start.path) {
-            start = Locations.home
+            starts = [URL(fileURLWithPath: path)]
+        } else if defaults.object(forKey: "reopenLastFolder") as? Bool ?? true {
+            // Reopen the tabs from last time, skipping folders that are gone.
+            let saved = defaults.stringArray(forKey: "pane.tabs") ?? defaults.string(forKey: "pane.folder").map { [$0] } ?? []
+            starts = saved.filter { FileManager.default.fileExists(atPath: $0) }.map { URL(fileURLWithPath: $0) }
+            active = min(defaults.integer(forKey: "pane.activeTab"), max(starts.count - 1, 0))
         }
-        tab = FolderTab(start: start, view: view)
-        view.onChange = { [unowned self] in tab.viewSettingsChanged() }
-        tab.didNavigate = { [unowned self] in
-            isEditingAddress = false
-            refreshPins()
-            syncTree()
-            Prefs.defaults.set(tab.currentFolder.path, forKey: "pane.folder")
+        if starts.isEmpty {
+            let downloads = Locations.home.appending(path: "Downloads", directoryHint: .isDirectory)
+            starts = [FileManager.default.fileExists(atPath: downloads.path) ? downloads : Locations.home]
         }
+        view.onChange = { [unowned self] in for tab in tabs { tab.viewSettingsChanged() } }
         actions.tabProvider = { [unowned self] in tab }
+        tabs = starts.map { makeTab(start: $0) }
+        activeIndex = active
+        for tab in tabs { tab.begin() }
+        activated()
+    }
+
+    // MARK: Tabs
+
+    private func makeTab(start: URL) -> FolderTab {
+        let tab = FolderTab(start: start, view: view)
+        tab.didNavigate = { [unowned self, unowned tab] in
+            // A tab in the background changes nothing outside itself.
+            if tab === self.tab { activated() } else { saveTabs() }
+        }
+        return tab
+    }
+
+    /// Opens a folder in a new tab, next to the current one, and shows it.
+    func newTab(at url: URL? = nil, activate: Bool = true) {
+        let tab = makeTab(start: url ?? self.tab.currentFolder)
+        tabs.insert(tab, at: activeIndex + 1)
         tab.begin()
+        if activate { select(tabs.firstIndex { $0 === tab } ?? activeIndex) } else { saveTabs() }
+    }
+
+    func select(_ index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        activeIndex = index
+        activated()
+    }
+
+    func selectNextTab() { select((activeIndex + 1) % tabs.count) }
+    func selectPreviousTab() { select((activeIndex - 1 + tabs.count) % tabs.count) }
+
+    /// Closes a tab. The last tab is not closed here: the window closes instead (returns false).
+    @discardableResult
+    func close(_ tab: FolderTab) -> Bool {
+        guard tabs.count > 1, let index = tabs.firstIndex(where: { $0 === tab }) else { return false }
+        let wasActive = index == activeIndex
+        tabs.remove(at: index)
+        if index < activeIndex { activeIndex -= 1 }
+        activeIndex = min(activeIndex, tabs.count - 1)
+        if wasActive { activated() } else { saveTabs() }
+        return true
+    }
+
+    func closeOtherTabs(except tab: FolderTab) {
+        guard let keep = tabs.firstIndex(where: { $0 === tab }) else { return }
+        tabs = [tabs[keep]]
+        activeIndex = 0
+        activated()
+    }
+
+    /// What changes when the shown tab changes or navigates: the tree, the Address bar, saved state.
+    private func activated() {
+        isEditingAddress = false
+        refreshPins()
+        syncTree()
+        saveTabs()
+    }
+
+    private func saveTabs() {
+        let defaults = Prefs.defaults
+        defaults.set(tabs.map { $0.currentFolder.path }, forKey: "pane.tabs")
+        defaults.set(activeIndex, forKey: "pane.activeTab")
+        defaults.set(tab.currentFolder.path, forKey: "pane.folder")
     }
 
     /// Cut and Copy work on a selection, or on the text in the Address bar.

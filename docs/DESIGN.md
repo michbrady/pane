@@ -13,7 +13,7 @@ Quick and familiar. A Windows user's hands know where things are. Every action a
 
 | Explorer part | Pane part | Surface |
 | --- | --- | --- |
-| Tab strip | Standard macOS window tabs (`NSWindow` tabbing) in the title bar, plus button | system |
+| Tab strip | An in-window row of tabs under the toolbar, with a plus button and a close icon on hover. Each tab is one `FolderTab`, so state, tests, and drops onto a tab stay in one model. Chosen over macOS window tabs, which make every tab its own window and model. | custom row |
 | Navigation pane | Sidebar column: Quick access, This Mac, Network. Glass comes from the system | `NavigationSplitView` sidebar, `List` + `OutlineGroup` replaced by `NSOutlineView` for large folders |
 | Command bar | The window toolbar over the content column | `.toolbar` |
 | Address bar and Search box | A slim row under the toolbar: Go back, Go forward, Go up, breadcrumbs, and `.searchable` at the trailing edge | custom row (see Custom chrome) |

@@ -6,7 +6,8 @@ import PaneKit
 /// One open folder: its history, listing, selection, and watcher.
 /// Tabs (S-026) make one of these per tab.
 @Observable
-final class FolderTab {
+final class FolderTab: Identifiable {
+    let id = UUID()
     private(set) var history: NavigationHistory
     private(set) var items: [FolderItem] = []
     var selection: Set<URL> = []

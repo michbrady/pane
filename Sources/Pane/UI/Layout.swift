@@ -10,6 +10,9 @@ enum Layout {
     static let previewMin: CGFloat = 240
     static let previewIdeal: CGFloat = 300
     static let previewMax: CGFloat = 480
+    /// The row of tabs, and one tab in it.
+    static let tabStripHeight: CGFloat = 36
+    static let tabHeight: CGFloat = 28
     /// The Address bar row under the toolbar.
     static let addressBarHeight: CGFloat = 36
     /// The Status bar at the bottom of the content column.

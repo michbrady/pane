@@ -61,6 +61,27 @@ struct PaneApp: App {
                     .keyboardShortcut(".", modifiers: [.command, .shift])
                 Toggle("Show File Extensions", isOn: Binding(get: { model.view.showExtensions }, set: { model.view.showExtensions = $0 }))
             }
+            CommandGroup(replacing: .saveItem) {
+                Button("New Tab") { model.newTab() }
+                    .keyboardShortcut("t")
+                Button("Close Tab") {
+                    // The last tab closes the window.
+                    if !model.close(model.tab) { NSApp.keyWindow?.performClose(nil) }
+                }
+                .keyboardShortcut("w")
+            }
+            CommandGroup(after: .windowArrangement) {
+                Divider()
+                Button("Show Next Tab") { model.selectNextTab() }
+                    .keyboardShortcut(.tab, modifiers: .control)
+                Button("Show Previous Tab") { model.selectPreviousTab() }
+                    .keyboardShortcut(.tab, modifiers: [.control, .shift])
+                ForEach(1...9, id: \.self) { number in
+                    Button("Go to Tab \(number)") { model.select(number - 1) }
+                        .keyboardShortcut(KeyEquivalent(Character(String(number))), modifiers: .command)
+                        .disabled(number > model.tabs.count)
+                }
+            }
             CommandMenu("Go") {
                 Button("Back") { model.tab.goBack() }
                     .keyboardShortcut("[")

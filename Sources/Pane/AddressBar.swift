@@ -56,8 +56,13 @@ private struct BreadcrumbTrail: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 0) {
                 ForEach(chain, id: \.self) { url in
-                    Button(Locations.displayName(for: url)) { model.tab.go(to: url) }
+                    Button(Locations.displayName(for: url)) {
+                        // Command-click opens the folder in a new tab.
+                        if NSEvent.modifierFlags.contains(.command) { model.newTab(at: url) } else { model.tab.go(to: url) }
+                    }
                         .buttonStyle(.plain)
+                        .onMiddleClick { model.newTab(at: url) }
+                        .contextMenu { Button("Open in New Tab") { model.newTab(at: url) } }
                         .padding(.horizontal, Space.xs)
                         .acceptsFileDrops(into: url, model: model)
                         .help("Go to \(Locations.displayName(for: url))")

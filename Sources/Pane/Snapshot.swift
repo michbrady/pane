@@ -12,7 +12,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -22,6 +22,7 @@ enum Snapshot {
             model.actions.pendingDelete = nil
             model.actions.cancelRename()
             model.view.reset()
+            model.closeOtherTabs(except: model.tab)
             switch self {
             case .window:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
@@ -65,6 +66,11 @@ enum Snapshot {
                     try? await Task.sleep(for: .milliseconds(200))
                     model.actions.beginRename()
                 }
+            case .tabs:
+                let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
+                model.tab.go(to: docs)
+                model.newTab(at: home.appending(path: "Pictures", directoryHint: .isDirectory), activate: false)
+                model.newTab(at: home.appending(path: "Downloads", directoryHint: .isDirectory), activate: false)
             case .sorted:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.view.setSort(.size, ascending: false)

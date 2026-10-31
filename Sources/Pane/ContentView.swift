@@ -59,6 +59,8 @@ struct FolderPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            TabStrip()
+            Divider()
             AddressBar()
             Divider()
             DetailsView()

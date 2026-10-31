@@ -285,14 +285,16 @@ Acceptance:
 - [snap] Tabs sit in the title bar with a plus button and a close icon on hover.
 - [unit] Closing the last tab closes the window.
 - [self] Tabs restore on relaunch.
-Status: todo
+Note: the tab strip sits in the window under the toolbar, not in the title bar (decided in docs/DESIGN.md). Tabs are saved as folder paths and the shown tab; try quitting and reopening by hand [manual]. A file dropped on a tab is built but not tried with a real drag [manual].
+Status: done
 
 ### S-027 Open a folder in a new tab
 As the user, I middle-click or Cmd-click a folder to open it in a new tab.
 Depends: S-026
 Acceptance:
 - [self] Both gestures work in the list, tree and breadcrumbs.
-Status: todo
+Note: middle-click works on breadcrumbs and tree folders, and Command-click works on breadcrumbs. In the file list Command-click still adds to the selection, so use the context menu "Open in New Tab" there. Middle-click and Command-click need a real mouse to try [manual].
+Status: done
 
 ### S-028 Select like Explorer
 As the user, I click, Cmd-click and Shift-click to select, drag a box on empty space, and use Cmd+A.

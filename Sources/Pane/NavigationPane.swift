@@ -51,7 +51,9 @@ private struct NavRow: View {
         }
         .tag(node.id)
         .acceptsFileDrops(into: node.url, model: model)
+        .onMiddleClick { model.newTab(at: node.url) }
         .contextMenu {
+            Button("Open in New Tab") { model.newTab(at: node.url) }
             if model.isPinned(node.url) {
                 Button("Unpin from Quick access") { model.unpin(node.url) }
             } else {
