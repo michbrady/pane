@@ -5,7 +5,7 @@ Two targets. `PaneKit` has no SwiftUI. `Pane` is the app and depends on it.
 | Target | Holds |
 | --- | --- |
 | `PaneKit` | `FolderItem`, `FolderLister`, `NavigationHistory`, `PathResolver`, `Breadcrumbs`, `FileSystem`, `FileOperations`, `OperationRecord`, `DropRules`. Pure, testable with `swift test`. |
-| `Pane` | `AppModel` (navigation, listing, tree, address state), views, `Locations` and `Prefs`, `FolderWatcher`, `NavNode`, snapshot and self-test modes. |
+| `Pane` | `AppModel` (the tabs, the Navigation pane, the Address bar, Quick access pins), `FolderTab` (one folder: history, listing, selection, watcher), `FileActions` (clipboard, operations, sheets, undo, for the active tab), `ViewSettings` (sort, view mode, hidden files, columns), views, `Locations` and `Prefs`, `FolderWatcher`, `NavNode`, snapshot and self-test modes. |
 
 Data flow: `AppModel.go(to:)` updates `NavigationHistory`, reloads the
 listing on a background task through `FolderLister`, and watches the folder
@@ -23,5 +23,4 @@ Trash, delete, rename, and new folder. Each change returns an `OperationRecord` 
 
 `Clipboard` puts real file URLs on the pasteboard, so Finder can paste them, and remembers what was cut.
 
-Next: `docs/architecture-review-2026-10-31-m2.md` recommends splitting `AppModel` into `FolderTab` and `FileActions`
-before tabs (S-026).
+Reviews: `docs/architecture-review-2026-10-31-m2.md` split `AppModel` into `FolderTab` and `FileActions` before tabs. `docs/architecture-review-2026-10-31-m3.md` found nothing to change after M3.
