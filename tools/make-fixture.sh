@@ -19,6 +19,10 @@ file "$d/file10.txt" 1 202610020000
 file "$d/Work/Roadmap.key" 5200 202610221000
 file "$d/Work/Invoice 0042.pdf" 96 202610091100
 touch -t 202610200900 "$d/Work" "$d/Personal" "$d/Tax Returns"
+# Finder tags, so the Tags column has something to show.
+tag() { xattr -wx com.apple.metadata:_kMDItemUserTags "$(python3 -c 'import plistlib,sys;print(plistlib.dumps(sys.argv[2:],fmt=plistlib.FMT_BINARY).hex())' x "${@:2}")" "$1"; }
+tag "$d/Budget 2026.xlsx" "Work"
+tag "$d/Trip itinerary.pdf" "Red" "Travel"
 file "$home/Pictures/Beach.jpg" 3400 202608141530
 file "$home/Pictures/Family.png" 2100 202607040900
 file "$home/Downloads/Installer.dmg" 80000 202610301800

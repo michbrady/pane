@@ -247,7 +247,8 @@ Acceptance:
 - [self] Date created, Kind and Tags can be added.
 - [unit] Widths and order save per folder.
 - [self] Double-clicking an edge fits to content.
-Status: todo
+Note: right-click a column header to show or hide columns (the system menu). Widths and order are saved for each folder. Resizing and double-clicking an edge to fit are the Table's own; try them by hand [manual]. Tags show as text until S-034 adds colored dots.
+Status: done
 
 ### S-023 Switch view mode
 As the user, I pick Details, List, or Icons from the View menu or Ctrl+Cmd+1/2/3.
@@ -304,6 +305,7 @@ Acceptance:
 - [self] Rubber band selection works in Details and Icons.
 - [unit] Shift-click selects a range in sort order.
 - [self] Selection count shows in the status bar.
+Note: blocked on the rubber band. The Table already gives click, Command-click, Shift-click, and Command-A, and the Status bar shows the selection count and size. Drawing a box around items needs a custom table or grid, a larger change. Left as todo for a decision.
 Status: todo
 
 ## M4 Find and inspect

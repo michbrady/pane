@@ -19,24 +19,41 @@ struct DetailsView: View {
                     }
                 }
             } else {
-                Table(of: FolderItem.self, selection: $tab.selection, sortOrder: sortOrder) {
+                Table(of: FolderItem.self, selection: $tab.selection, sortOrder: sortOrder, columnCustomization: columnLayout) {
                     TableColumn("Name", value: \.name) { NameCell(model: model, item: $0) }
                         .width(min: 160, ideal: 280)
+                        .customizationID("name")
                     TableColumn("Date modified", value: \.sortModified) { item in
                         Text(item.modified.map(Format.date) ?? "")
                             .foregroundStyle(.secondary)
                     }
-                    .width(min: 120, ideal: 150)
+                    .width(min: 130, ideal: 175)
+                    .customizationID("modified")
+                    TableColumn("Date created", value: \.sortCreated) { item in
+                        Text(item.created.map(Format.date) ?? "")
+                            .foregroundStyle(.secondary)
+                    }
+                    .width(min: 130, ideal: 175)
+                    .customizationID("created")
+                    .defaultVisibility(.hidden)
                     TableColumn("Type", value: \.kind) { item in
                         Text(item.kind).foregroundStyle(.secondary).lineLimit(1)
                     }
                     .width(min: 80, ideal: 140)
+                    .customizationID("kind")
+                    TableColumn("Tags") { item in
+                        Text(item.tags.joined(separator: ", ")).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    .width(min: 60, ideal: 100)
+                    .customizationID("tags")
+                    .defaultVisibility(.hidden)
                     TableColumn("Size", value: \.sortSize) { item in
                         Text(item.size.map(Format.size) ?? "—")
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                     .width(min: 60, ideal: 80)
+                    .customizationID("size")
                 } rows: {
                     ForEach(tab.items) { item in
                         TableRow(item).draggable(item.url)
@@ -52,6 +69,13 @@ struct DetailsView: View {
         .alternatingRowBackgrounds(.disabled)
     }
 
+    /// Which columns show, and their order and widths. Saved for each folder.
+    private var columnLayout: Binding<TableColumnCustomization<FolderItem>> {
+        Binding(
+            get: { model.view.columns(for: model.tab.currentFolder) },
+            set: { model.view.setColumns($0, for: model.tab.currentFolder) })
+    }
+
     /// The Table shows the sort arrow from this, and a click on a header writes it back.
     private var sortOrder: Binding<[KeyPathComparator<FolderItem>]> {
         Binding(
@@ -60,6 +84,7 @@ struct DetailsView: View {
                 switch model.view.sortKey {
                 case .name: return [KeyPathComparator(\FolderItem.name, order: order)]
                 case .modified: return [KeyPathComparator(\FolderItem.sortModified, order: order)]
+                case .created: return [KeyPathComparator(\FolderItem.sortCreated, order: order)]
                 case .kind: return [KeyPathComparator(\FolderItem.kind, order: order)]
                 case .size: return [KeyPathComparator(\FolderItem.sortSize, order: order)]
                 }
@@ -68,6 +93,7 @@ struct DetailsView: View {
                 guard let first = comparators.first else { return }
                 let path = first.keyPath as AnyKeyPath
                 let key: SortKey = path == \FolderItem.sortModified ? .modified
+                    : path == \FolderItem.sortCreated ? .created
                     : path == \FolderItem.kind ? .kind
                     : path == \FolderItem.sortSize ? .size : .name
                 model.view.setSort(key, ascending: first.order == .forward)

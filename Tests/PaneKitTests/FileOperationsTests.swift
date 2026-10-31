@@ -261,6 +261,27 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(pins.urls.isEmpty)
 }
 
+@Test func listingReadsCreatedDateAndTags() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-tags-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appending(path: "tagged.txt")
+    try Data("x".utf8).write(to: file)
+    var values = URLResourceValues()
+    values.tagNames = ["Work", "Red"]
+    var mutable = file
+    try mutable.setResourceValues(values)
+    let listed = try FolderLister.list(root)
+    #expect(listed.first?.created != nil)
+    #expect(Set(listed.first?.tags ?? []) == ["Work", "Red"])
+}
+
+@Test func sortByCreatedDateFallsBackToName() {
+    let a = FolderItem(url: URL(fileURLWithPath: "/x/a"), name: "a", isFolder: false, size: 1, modified: nil, kind: "File", created: Date(timeIntervalSince1970: 200))
+    let b = FolderItem(url: URL(fileURLWithPath: "/x/b"), name: "b", isFolder: false, size: 1, modified: nil, kind: "File", created: Date(timeIntervalSince1970: 100))
+    #expect(FolderSorter.sorted([a, b], key: .created, ascending: true, foldersFirst: true).map(\.name) == ["b", "a"])
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

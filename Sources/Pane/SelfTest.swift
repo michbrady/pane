@@ -352,6 +352,22 @@ enum SelfTest {
             model.view.reset()
             check("reset returns to Details", model.view.mode == .details)
 
+            // S-022 Choose and resize columns
+            model.tab.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.4))
+            check("Date created and Tags start hidden",
+                  model.view.columns(for: docs)[visibility: "created"] != .visible && model.view.columns(for: docs)[visibility: "tags"] != .visible)
+            var layout = model.view.columns(for: docs)
+            layout[visibility: "created"] = .visible
+            model.view.setColumns(layout, for: docs)
+            check("a column can be shown", model.view.columns(for: docs)[visibility: "created"] == .visible)
+            check("the layout is saved per folder", model.view.columns(for: drop)[visibility: "created"] != .visible)
+            check("the layout is saved between launches", ViewSettings().columns(for: docs)[visibility: "created"] == .visible)
+            check("listing reads tags", model.tab.items.first { $0.name == "Budget 2026.xlsx" }?.tags == ["Work"],
+                  "\(model.tab.items.first { $0.name == "Budget 2026.xlsx" }?.tags ?? [])")
+            model.view.reset()
+            check("reset forgets the layouts", model.view.columns(for: docs)[visibility: "created"] != .visible)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

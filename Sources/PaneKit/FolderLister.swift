@@ -5,7 +5,7 @@ import Foundation
 public enum FolderLister {
     static let keys: [URLResourceKey] = [
         .isDirectoryKey, .isPackageKey, .isSymbolicLinkKey, .fileSizeKey,
-        .contentModificationDateKey, .localizedTypeDescriptionKey, .nameKey,
+        .contentModificationDateKey, .creationDateKey, .tagNamesKey, .localizedTypeDescriptionKey, .nameKey,
     ]
 
     public static func list(_ folder: URL, showHidden: Bool = false) throws -> [FolderItem] {
@@ -30,7 +30,9 @@ public enum FolderLister {
             isFolder: isFolder,
             size: isFolder ? nil : values.fileSize.map(Int64.init),
             modified: values.contentModificationDate,
-            kind: isFolder ? "File folder" : (values.localizedTypeDescription ?? "File"))
+            kind: isFolder ? "File folder" : (values.localizedTypeDescription ?? "File"),
+            created: values.creationDate,
+            tags: values.tagNames ?? [])
     }
 
     public static func sorted(_ items: [FolderItem]) -> [FolderItem] {

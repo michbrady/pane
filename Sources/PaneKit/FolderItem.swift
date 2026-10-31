@@ -11,15 +11,21 @@ public struct FolderItem: Identifiable, Hashable, Sendable {
     public let modified: Date?
     /// The localized kind, like "PDF Document".
     public let kind: String
+    public let created: Date?
+    /// Finder tag names, like "Red" or "Work".
+    public let tags: [String]
 
     public var id: URL { url }
 
-    public init(url: URL, name: String, isFolder: Bool, size: Int64?, modified: Date?, kind: String) {
+    public init(url: URL, name: String, isFolder: Bool, size: Int64?, modified: Date?, kind: String,
+                created: Date? = nil, tags: [String] = []) {
         self.url = url
         self.name = name
         self.isFolder = isFolder
         self.size = size
         self.modified = modified
         self.kind = kind
+        self.created = created
+        self.tags = tags
     }
 }

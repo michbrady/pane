@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PaneKit
+import SwiftUI
 
 enum ViewMode: String, CaseIterable {
     case details, list, icons
@@ -34,6 +35,8 @@ final class ViewSettings {
     var showHidden: Bool { didSet { changed() } }
     /// Show ".pdf" after names. On by default, so a name is never ambiguous.
     var showExtensions: Bool { didSet { changed() } }
+    /// Which columns show, and their order and widths, saved for each folder as JSON.
+    private(set) var columnData: [String: Data]
     /// Called after any change, so open tabs can re-sort.
     var onChange: (() -> Void)?
 
@@ -41,6 +44,7 @@ final class ViewSettings {
 
     init(defaults: UserDefaults = Prefs.defaults) {
         self.defaults = defaults
+        columnData = defaults.dictionary(forKey: "view.columns") as? [String: Data] ?? [:]
         mode = ViewMode(rawValue: defaults.string(forKey: "view.mode") ?? "") ?? .details
         sortKey = SortKey(rawValue: defaults.string(forKey: "view.sortKey") ?? "") ?? .name
         ascending = defaults.object(forKey: "view.ascending") as? Bool ?? true
@@ -55,7 +59,27 @@ final class ViewSettings {
         self.ascending = ascending
     }
 
+    /// The column layout for a folder, or the default one when none was saved.
+    func columns(for folder: URL) -> TableColumnCustomization<FolderItem> {
+        guard let data = columnData[folder.standardizedFileURL.path],
+              let saved = try? JSONDecoder().decode(TableColumnCustomization<FolderItem>.self, from: data) else {
+            return TableColumnCustomization<FolderItem>()
+        }
+        return saved
+    }
+
+    func setColumns(_ layout: TableColumnCustomization<FolderItem>, for folder: URL) {
+        guard let data = try? JSONEncoder().encode(layout) else { return }
+        let key = folder.standardizedFileURL.path
+        guard columnData[key] != data else { return }
+        // A layout is small, but keep the saved set from growing without end.
+        if columnData.count >= 300, columnData[key] == nil, let oldest = columnData.keys.first { columnData[oldest] = nil }
+        columnData[key] = data
+        defaults.set(columnData, forKey: "view.columns")
+    }
+
     func reset() {
+        columnData = [:]
         mode = .details
         sortKey = .name
         ascending = true

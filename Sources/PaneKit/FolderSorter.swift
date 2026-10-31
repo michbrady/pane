@@ -1,7 +1,7 @@
 import Foundation
 
 public enum SortKey: String, Sendable, CaseIterable {
-    case name, modified, kind, size
+    case name, modified, created, kind, size
 }
 
 /// Orders a folder listing for the column headers.
@@ -25,6 +25,9 @@ public enum FolderSorter {
         case .modified:
             let x = a.modified ?? .distantPast, y = b.modified ?? .distantPast
             return x == y ? byName() : (x < y ? .orderedAscending : .orderedDescending)
+        case .created:
+            let x = a.created ?? .distantPast, y = b.created ?? .distantPast
+            return x == y ? byName() : (x < y ? .orderedAscending : .orderedDescending)
         case .kind:
             let order = a.kind.localizedStandardCompare(b.kind)
             return order == .orderedSame ? byName() : order
@@ -38,6 +41,7 @@ public enum FolderSorter {
 public extension FolderItem {
     /// Non-optional values for the Table's sortable columns.
     var sortModified: Date { modified ?? .distantPast }
+    var sortCreated: Date { created ?? .distantPast }
     var sortSize: Int64 { size ?? -1 }
 }
 
