@@ -7,7 +7,7 @@ A BradysBit app. Native SwiftUI, macOS 26 or later, free.
 
 ## What works today
 
-- Windows 11 Explorer layout: a folder tree, an Address bar with breadcrumbs, and a Details view with sortable-looking columns.
+- Windows 11 Explorer layout: a folder tree, an Address bar with breadcrumbs, and a Details view with Name, Date modified, Type, and Size columns.
 - Go back, forward, and up. Type a path in the Address bar (`~`, `~/Documents`).
 - Cut, Copy, and Paste, where Cut really moves the files (Finder has no Cut).
 - A conflict sheet (Replace, Skip, Keep Both), the Trash with Undo, and Delete Immediately with a confirmation.
