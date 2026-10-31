@@ -136,6 +136,31 @@ final class AppModel {
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
 
+    // MARK: Tags
+
+    func tags(of url: URL) -> [String] {
+        let path = url.standardizedFileURL.path
+        return tab.items.first { $0.url.standardizedFileURL.path == path }?.tags ?? TagEditor.tags(of: url)
+    }
+
+    /// The tags every one of these items has.
+    func commonTags(of urls: [URL]) -> Set<String> {
+        guard let first = urls.first else { return [] }
+        return urls.dropFirst().reduce(Set(tags(of: first))) { $0.intersection(tags(of: $1)) }
+    }
+
+    func setTag(_ name: String, on urls: [URL], add: Bool) {
+        let failed = TagEditor.apply(name, to: urls, add: add)
+        if let first = failed.first { actions.alertMessage = "Unable to change the tags on \(first.lastPathComponent)." }
+        tab.reload()
+    }
+
+    func removeAllTags(from urls: [URL]) {
+        let failed = TagEditor.removeAll(from: urls)
+        if let first = failed.first { actions.alertMessage = "Unable to change the tags on \(first.lastPathComponent)." }
+        tab.reload()
+    }
+
     // MARK: Properties
 
     /// Cmd-I: the selected items, or the folder being shown when nothing is selected.

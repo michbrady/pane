@@ -352,7 +352,8 @@ Depends: S-033
 Acceptance:
 - [unit] Tags read and write through `tagNamesKey`.
 - [self] A tag shows as a colored dot in the Tags column.
-Status: todo
+Note: tags change from the Tags submenu in the context menu and in the Properties panel. Tag changes are not part of Undo. A tag with no standard color shows a gray dot.
+Status: done
 
 ### S-035 See the status bar
 As the user, I see the item count, the selection count and size.

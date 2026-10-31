@@ -40,6 +40,13 @@ struct PropertiesSheet: View {
                 }
             }
             HStack {
+                Text("Tags").foregroundStyle(.secondary)
+                TagDots(tags: Array(commonTags))
+                TagMenu(model: model, urls: urls) { items = urls.compactMap(ItemProperties.read) }
+                    .fixedSize()
+                Spacer()
+            }
+            HStack {
                 Spacer()
                 Button("Done") { model.closeProperties() }
                     .keyboardShortcut(.defaultAction)
@@ -49,6 +56,12 @@ struct PropertiesSheet: View {
         .frame(width: Layout.sheetWidth)
         .noInitialFocus()
         .task { await load() }
+    }
+
+    /// Tags every selected item has.
+    private var commonTags: [String] {
+        guard let first = items.first else { return [] }
+        return first.tags.filter { tag in items.allSatisfy { $0.tags.contains(tag) } }
     }
 
     private var single: ItemProperties? { items.count == 1 ? items.first : nil }

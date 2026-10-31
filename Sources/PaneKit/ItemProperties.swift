@@ -14,6 +14,7 @@ public struct ItemProperties: Sendable, Equatable {
     public let modified: Date?
     /// Like "rw-r--r--".
     public let permissions: String
+    public let tags: [String]
 
     public static func read(_ url: URL) -> ItemProperties? {
         let keys: Set<URLResourceKey> = [.nameKey, .localizedTypeDescriptionKey, .isDirectoryKey, .isPackageKey, .fileSizeKey,
@@ -30,7 +31,8 @@ public struct ItemProperties: Sendable, Equatable {
             sizeOnDisk: isFolder ? nil : values.totalFileAllocatedSize.map(Int64.init),
             created: values.creationDate,
             modified: values.contentModificationDate,
-            permissions: permissionText(posix))
+            permissions: permissionText(posix),
+            tags: TagEditor.tags(of: url))
     }
 
     /// 0o644 becomes "rw-r--r--".

@@ -331,6 +331,26 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(total.bytes == 123)
 }
 
+@Test func tagsAreAddedAndRemovedThroughResourceValues() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-tagedit-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let a = root.appending(path: "a.txt"), b = root.appending(path: "b.txt")
+    try Data("x".utf8).write(to: a)
+    try Data("x".utf8).write(to: b)
+    #expect(TagEditor.apply("Red", to: [a, b], add: true).isEmpty)
+    #expect(TagEditor.tags(of: a) == ["Red"] && TagEditor.tags(of: b) == ["Red"])
+    TagEditor.apply("Red", to: [a], add: true)
+    #expect(TagEditor.tags(of: a) == ["Red"])
+    TagEditor.apply("Work", to: [a], add: true)
+    #expect(Set(TagEditor.tags(of: a)) == ["Red", "Work"])
+    TagEditor.apply("Red", to: [a, b], add: false)
+    #expect(TagEditor.tags(of: a) == ["Work"] && TagEditor.tags(of: b).isEmpty)
+    TagEditor.removeAll(from: [a, b])
+    #expect(TagEditor.tags(of: a).isEmpty)
+    #expect(TagEditor.standard.count == 7)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

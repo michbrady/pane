@@ -383,6 +383,21 @@ enum SelfTest {
             model.closeProperties()
             check("Done closes the panel", model.propertiesURLs == nil)
 
+            // S-034 Tag files
+            model.tab.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.4))
+            let notesURL = model.tab.items.first { $0.name == "Notes.txt" }!.url
+            model.setTag("Blue", on: [notesURL], add: true)
+            try? await Task.sleep(for: .seconds(0.8))
+            check("a tag is added and shows in the listing", model.tab.items.first { $0.name == "Notes.txt" }?.tags == ["Blue"],
+                  "\(model.tab.items.first { $0.name == "Notes.txt" }?.tags ?? [])")
+            check("the Tags menu knows which tags every item has", model.commonTags(of: [notesURL]) == ["Blue"])
+            model.setTag("Blue", on: [notesURL], add: false)
+            try? await Task.sleep(for: .seconds(0.8))
+            check("removing a tag takes it off", model.tab.items.first { $0.name == "Notes.txt" }?.tags.isEmpty == true)
+            check("every standard tag except Gray has its own color", TagEditor.standard.filter { $0 != "Gray" }.allSatisfy { TagColor.color($0) != .gray })
+            check("a custom tag is gray", TagColor.color("Taxes") == .gray)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

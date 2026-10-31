@@ -42,7 +42,7 @@ struct DetailsView: View {
                     .width(min: 80, ideal: 140)
                     .customizationID("kind")
                     TableColumn("Tags") { item in
-                        Text(item.tags.joined(separator: ", ")).foregroundStyle(.secondary).lineLimit(1)
+                        TagDots(tags: item.tags).foregroundStyle(.secondary)
                     }
                     .width(min: 60, ideal: 100)
                     .customizationID("tags")
@@ -134,6 +134,7 @@ struct ItemMenu: View {
     var body: some View {
         if !urls.isEmpty {
             Button("Open") { model.tab.open(Array(urls)) }
+            TagMenu(model: model, urls: Array(urls))
             if urls.count == 1 {
                 Button("Rename") { model.actions.beginRename() }
                 if let folder = model.tab.items.first(where: { urls.contains($0.url) && $0.isFolder }) {
