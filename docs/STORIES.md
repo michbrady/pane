@@ -2,12 +2,12 @@
 
 Snapshot pages (named for `Screens:`): `window` (default window), `details`
 (Details view), `tree`, `tabs`, `conflict` (copy conflict sheet),
-`properties`, `preview`, `search`, `context-menu`, `settings`,
+`properties`, `preview`, `connect` (Connect to Server), `search`, `context-menu`, `settings`,
 `onboarding` (Full Disk Access), `empty-folder`.
 
 Decisions (agent): Cmd+1-9 go to tab N. View modes are Ctrl+Cmd+1/2/3.
 Cmd+Shift+3-5 and F11 are not bound. Delete and Cmd+Delete both trash.
-Backspace does nothing. Return opens, F2 renames. FTP, SFTP, S3 are Later.
+Backspace does nothing. Return opens, F2 renames. SMB and cloud storage are in version one (M5). FTP, SFTP, S3 wait on a user decision.
 
 ## M1 Browse
 
@@ -390,6 +390,39 @@ Acceptance:
 - [unit] Network folders refresh by polling every ten seconds.
 Status: todo
 
+### S-046 Connect to an SMB server
+As the user, I choose Go > Connect to Server…, type `smb://nas/photos`, enter my name and password once, and the share appears in the tree.
+Screens: connect
+Depends: S-044
+Acceptance:
+- [snap] A sheet titled "Connect to Server" has an address field, a "Remember this password in my Keychain" checkbox, and "Connect" and "Cancel" buttons.
+- [self] A bad address or a refused login shows the reason under the field and keeps the sheet open.
+- [manual] Connecting mounts the share through `NetFS`, and the new share shows under Network and opens on Return.
+- [unit] An address without `smb://` is rejected, and spaces and special characters in names are encoded.
+- [self] Recent servers show in a list in the sheet, and the list can be cleared.
+Status: todo
+
+### S-047 Disconnect a share or eject a drive
+As the user, I click the eject icon beside a share or drive in the tree to disconnect it.
+Depends: S-046
+Acceptance:
+- [self] The eject icon shows only for ejectable volumes and shares.
+- [self] A busy volume shows "Unable to eject. Items are in use." with a "Cancel" button.
+- [self] A share that disappears leaves the tree and shows its folder as unavailable if it was open.
+Status: todo
+
+### S-048 Use cloud storage folders
+As the user, I see iCloud Drive, Dropbox, Google Drive and OneDrive in the tree and browse them like any folder.
+Screens: tree
+Depends: S-044
+Acceptance:
+- [manual] Providers set up on this Mac show under "Cloud" in the Navigation pane. Test with at least iCloud Drive and one other provider. [U] These live under `~/Library/CloudStorage`.
+- [snap] Items not yet on this Mac show a cloud icon and the Status bar says how many are online only.
+- [self] Opening an online-only file downloads it, with progress, and then opens it.
+- [self] The list updates when a provider finishes syncing.
+- [unit] Placeholder files are listed by their real name and size, not `.icloud` names.
+Status: todo
+
 ### S-045 Reveal and open in Terminal
 As the user, I right-click a folder and choose Open in Terminal.
 Depends: S-003
@@ -444,8 +477,8 @@ Status: todo
 
 ## Later
 - Dual pane and Drop Stack.
-- FTP, SFTP, S3 and other remote servers.
+- FTP, SFTP and S3 (waiting on a user decision, see the brief).
 - Zip browsing, batch rename.
 - Tiles and Content views.
 - Compare dialog inside the conflict sheet.
-- Dropbox and other cloud integrations beyond the system ones.
+- Cloud features beyond folders the system provides: sharing links, selective sync, version history.

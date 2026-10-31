@@ -20,7 +20,8 @@ Sidebar window (tree on the left, content on the right, optional preview pane, s
 ## System hooks
 - Optional default for opening folders and "Reveal in Finder" from other apps (`NSFileViewer`, `public.folder`). Finder keeps the Desktop, Trash UI, AirDrop and Put Back.
 - Global shortcut to open a Pane window (like Win+E).
-- Quick Look, tags, Spotlight search, SMB and iCloud through the system.
+- Quick Look, tags, Spotlight search.
+- Network and cloud: connect to SMB servers, browse mounted shares, and use iCloud Drive, Dropbox, Google Drive and OneDrive folders the system provides.
 
 ## Reference
 None. Windows 11 File Explorer cannot be opened on this Mac. Layout and shortcuts come from `docs/research/explorer-style-file-manager.md`.
@@ -37,4 +38,4 @@ Native Mac chrome (system sidebar, toolbar, Liquid Glass, system fonts) arranged
 - Dual pane and Drop Stack.
 - Windows 11 Tiles and Content views (Details, List and Icons only).
 - Zip browsing and batch rename (system extract still works).
-- Not ruled out by the user, so decide in `user-stories`: FTP, SFTP and S3.
+- Undecided, waiting on the user: FTP, SFTP and S3. They need Pane's own client, because macOS no longer mounts FTP.
