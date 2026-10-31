@@ -1,11 +1,11 @@
 # Pane
 
 A native macOS app in SwiftUI. It runs on this Mac only, with a local
-SwiftData database and no server.
+no database and no server. Pane reads the file system.
 
 ## Layout
 
-- `Sources/Pane/` the app. `App.swift` has the window, menus, and the database location.
+- `Sources/Pane/` the app. `App.swift` has the window and menus. `AppModel.swift` holds navigation state. `Locations.swift` has the home folder and `Prefs`.
 - `Sources/PaneKit/` rules and data logic with no SwiftUI. Tests in `Tests/PaneKitTests/`.
 - `Package.swift` a Swift package. There is no Xcode project.
 - `build.sh` builds, signs, and installs `~/Applications/Pane.app`.
@@ -18,10 +18,10 @@ SwiftData database and no server.
 - Unit tests: `swift test --scratch-path ~/Library/Developer/Pane/test-build`.
 - Self-test (the app's real functions on a /tmp store): `tools/selftest.sh`. Exit 0 when every check passes. Add a check for every story with logic in `SelfTest.swift`.
 - After every UI change, take snapshots with sample data and look at them: `tools/snap.sh`.
-  It writes `/tmp/Pane-shots/<page>-light.png` and `-dark.png` for every sidebar page, and `settings-<tab>-light.png` and `-dark.png` for every Settings tab, then quits. `APP_SNAPSHOT_PAGES=all,settings tools/snap.sh` limits the pages.
+  It writes `/tmp/Pane-shots/<page>-light.png` and `-dark.png` for every snapshot page (`Snapshot.Page`), and `settings-<tab>-light.png` and `-dark.png` for every Settings tab, then quits. `APP_SNAPSHOT_PAGES=window,settings tools/snap.sh` limits the pages.
   For a panel, sheet, or popover, add a capture to `Snapshot.swift` like the Settings loop.
-- Snapshots, seed data, and the self-test refuse to run without `APP_STORE` in /tmp.
-- Never test against the real database in `~/Library/Application Support/Pane/`.
+- Snapshots and the self-test refuse to run without `APP_HOME` in /tmp. `tools/make-fixture.sh` builds that home folder.
+- Never test against your real folders or settings. `APP_HOME` also switches to a throwaway settings suite.
 - Then check the grid: `tools/grid-lint.sh` and `swift tools/check-layout.swift /tmp/Pane-shots/*-layout.json`. Both print PASS.
 - A change is done when the build has no errors, the grid checks pass, and you looked at the light and dark snapshots.
 

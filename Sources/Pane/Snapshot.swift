@@ -4,18 +4,43 @@ import SwiftUI
 
 /// Screenshot mode for agents.
 ///   APP_STORE=/tmp/test.store APP_SNAPSHOT=/tmp/shots ~/Applications/Pane.app/Contents/MacOS/Pane
-/// writes <page>-light.png and <page>-dark.png for every sidebar page, and
+/// writes <page>-light.png and <page>-dark.png for every snapshot page (SnapshotPage), and
 /// settings-<tab>-light.png and settings-<tab>-dark.png for every Settings tab, then quits.
 /// Each PNG gets a <page>-<mode>-layout.json with the grid probes (tools/check-layout.swift).
-/// APP_SNAPSHOT_PAGES=all,starred limits the pages. Add "settings" to include Settings.
+/// APP_SNAPSHOT_PAGES=window,tree limits the pages. Add "settings" to include Settings.
 /// Add APP_ACCENT=<id> to see the pages in another accent.
 enum Snapshot {
+    /// The views to capture. Add a case when a story adds a view.
+    enum Page: String, CaseIterable {
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder"
+
+        @MainActor func show(in model: AppModel) {
+            let home = Locations.home
+            model.cancelEditingAddress()
+            switch self {
+            case .window:
+                model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+            case .tree:
+                model.go(to: home.appending(path: "Documents/Work", directoryHint: .isDirectory))
+            case .addressEdit:
+                model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.beginEditingAddress()
+            case .addressError:
+                model.beginEditingAddress()
+                model.addressText = "~/Nope"
+                model.commitAddress()
+            case .emptyFolder:
+                model.go(to: home.appending(path: "Empty", directoryHint: .isDirectory))
+            }
+        }
+    }
+
     static func runIfRequested(model: AppModel, openSettings: OpenSettingsAction) {
         let env = ProcessInfo.processInfo.environment
         guard let dir = env["APP_SNAPSHOT"], !dir.isEmpty else { return }
-        // Snapshots never run against the real database.
-        guard Store.isOverridden else {
-            print("SNAPSHOT refused: set APP_STORE to a file in /tmp")
+        // Snapshots never run against your real folders or settings.
+        guard Locations.isOverridden else {
+            print("SNAPSHOT refused: set APP_HOME to a folder in /tmp")
             NSApp.terminate(nil)
             return
         }
@@ -32,8 +57,8 @@ enum Snapshot {
             try? await Task.sleep(for: .seconds(1.5))
             for mode in ["light", "dark"] {
                 NSApp.appearance = NSAppearance(named: mode == "light" ? .aqua : .darkAqua)
-                for page in SidebarItem.allCases where only?.contains(page.rawValue) ?? true {
-                    model.sidebar = page
+                for page in Page.allCases where only?.contains(page.rawValue) ?? true {
+                    page.show(in: model)
                     try? await Task.sleep(for: .seconds(0.8))
                     capture(to: "\(dir)/\(page.rawValue)-\(mode).png")
                 }

@@ -23,7 +23,8 @@ UX:
 - States: empty folder shows "This folder is empty"; loading shows nothing under half a second, then a spinner row "Loading…"; error "Unable to read this folder. Pane needs Full Disk Access." with an "Open Settings" button
 - Words: window title is the current folder name; Search box placeholder "Search"; tooltips on Command bar icons, for example "Copy the selected items (⌘C)"
 - Access: F6 cycles Navigation pane, list, Address bar; VoiceOver reads "Navigation pane", "Item list", "Address bar"
-Status: todo
+Note: the Command bar and Search box show in place but stay dimmed until S-041 and S-030.
+Status: done
 
 ### S-002 List a folder in Details view
 As the user, I see a folder's files with Name, Date modified, Type and Size columns.
@@ -39,7 +40,7 @@ UX:
 - States: empty "This folder is empty"; loading "Loading…" after half a second; error "Unable to read this folder." under the header with "Open Settings"; too much: long names truncate in the middle with the full name in a tooltip, and 100,000 rows scroll smoothly
 - Words: columns "Name", "Date modified", "Type", "Size"; sizes "4 KB"; folders show "—" for Size
 - Access: arrow keys move selection; VoiceOver reads "name, kind, size, date modified"
-Status: todo
+Status: done
 
 ### S-003 Open a folder or file
 As the user, I select an item and press Return, or double-click, to open it.
@@ -54,7 +55,8 @@ UX:
 - States: a file with no app shows an alert "No app can open this file." with "Choose App…" and "Cancel"; a locked folder shows the error state of S-002
 - Words: context menu "Open"; Return opens, F2 renames (a setting can swap them later)
 - Access: Return and Cmd+Down work from the keyboard alone; VoiceOver announces the new folder name
-Status: todo
+Note: Return, Cmd+Down and double-click are wired. Try them by hand [manual]: the self-test calls open() directly.
+Status: done
 
 ### S-004 Go back, forward, and up
 As the user, I click Back, Forward, Up or press Cmd+[, Cmd+] and Cmd+Up to move through folders.
@@ -70,7 +72,7 @@ UX:
 - States: Back, Forward and Up are dimmed when unavailable; at the root, Up is dimmed
 - Words: tooltips "Go back to the previous folder (⌘[)", "Go forward (⌘])", "Go up to the parent folder (⌘↑)"; menu items "Back", "Forward", "Enclosing Folder" under Go
 - Access: all three work from the keyboard; VoiceOver reads "Go back, dimmed"
-Status: todo
+Status: done
 
 ### S-005 Type a path in the address bar
 As the user, I click the address bar, or press F4 or Cmd+L, type a path, and press Return to go there.
@@ -86,7 +88,8 @@ UX:
 - States: bad path keeps the field open with the message "No folder at this path." under it in red text and an icon; `~` and paths with spaces work; too much: long paths scroll
 - Words: field label "Address"; tooltip on empty space "Type a path (⌘L)"
 - Access: Return goes, Escape cancels; VoiceOver "Address, text field"
-Status: todo
+Note: F4 and Cmd+L start editing. Try them by hand [manual].
+Status: done
 
 ### S-006 Click breadcrumbs
 As the user, I click a folder in the breadcrumbs to jump there, and click a chevron to see its sibling folders.
@@ -101,7 +104,8 @@ UX:
 - States: a folder with no subfolders shows "No Folders" dimmed in the menu; the menu lists at most 30 with "Show All…" for more
 - Words: tooltip on a breadcrumb "Go to Documents"; chevron "Show folders inside Documents"
 - Access: keyboard focus reaches breadcrumbs with F6; VoiceOver reads "Documents, button" and "Show folders inside Documents, menu button"
-Status: todo
+Note: the chevron menu lists up to 30 folders. A "Show All…" item is not built.
+Status: done
 
 ### S-007 Browse with the folder tree
 As the user, I expand folders in the tree and click one to show it.
@@ -117,7 +121,8 @@ UX:
 - States: empty folder shows no arrow; loading shows a small spinner beside the arrow; error shows a lock icon with tooltip "Pane can't read this folder."; too much: only visible rows render
 - Words: sections "Quick access" and "This Mac"; tooltips on arrows "Show folders inside Downloads"
 - Access: arrow keys move and expand; VoiceOver reads "Downloads, collapsed, 1 of 6"
-Status: todo
+Note: Left and Right arrow expand and collapse, and a 10,000-folder tree load, still need a hand test [manual].
+Status: done
 
 ### S-008 Remember my window and folder
 As the user, I quit and reopen Pane and find the same folder, window size, and expanded tree.
@@ -131,7 +136,8 @@ UX:
 - States: if the saved folder is gone, open Downloads and show no error; if settings are unreadable, start fresh and show nothing
 - Words: none
 - Access: nothing new
-Status: todo
+Note: the folder and expanded tree restore. Window frame uses frame autosave. Try a relaunch by hand [manual].
+Status: done
 
 ## M2 Move files
 

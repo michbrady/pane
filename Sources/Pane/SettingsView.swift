@@ -54,11 +54,11 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 }
 
 struct GeneralSettings: View {
-    @AppStorage("confirmDelete") private var confirmDelete = true
+    @AppStorage("reopenLastFolder", store: Prefs.defaults) private var reopenLastFolder = true
 
     var body: some View {
-        Section("Items") {
-            Toggle("Ask before deleting items", isOn: $confirmDelete)
+        Section("Start") {
+            Toggle("Open the last folder when Pane starts", isOn: $reopenLastFolder)
         }
     }
 }

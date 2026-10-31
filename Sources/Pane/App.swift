@@ -1,20 +1,19 @@
 import AppKit
-import SwiftData
 import SwiftUI
 
 // Pane
 //   Pane                      the app
-//   APP_STORE=<file> Pane     use another database (tests, experiments)
-//   APP_SNAPSHOT=<dir> Pane   save a PNG of every sidebar page and Settings tab in light and dark mode, then quit
-//   APP_SEED=1 Pane           fill an empty /tmp store with sample items (tools/snap.sh)
-//   Pane --selftest           run the self-test on a /tmp store and quit with 0 or 1 (tools/selftest.sh)
+//   APP_HOME=<dir> Pane       treat <dir> as the home folder, with throwaway settings (tests, snapshots)
+//   APP_START=<dir> Pane      open this folder first
+//   APP_SNAPSHOT=<dir> Pane   save a PNG of every snapshot page and Settings tab in light and dark mode, then quit
+//   Pane --selftest           run the self-test on a /tmp folder and quit with 0 or 1 (tools/selftest.sh)
 //   APP_ACCENT=<id> Pane      run with another accent from Theme.all (UI/Theme.swift)
 //   APP_GRID=1 Pane           draw the 8 pt grid and the layout probes over the window
 
 @main
 struct PaneApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var model = AppModel(container: Store.makeContainer())
+    @State private var model = AppModel()
 
     var body: some Scene {
         Window("Pane", id: "main") {
@@ -24,15 +23,29 @@ struct PaneApp: App {
                 .overlay { if GridOverlay.enabled { GridOverlay() } }
                 .frame(minWidth: 760, minHeight: 480)
         }
-        .modelContainer(model.container)
         .defaultSize(width: 1100, height: 720)
         .windowToolbarStyle(.unified)
         .commands {
             SidebarCommands()
             ToolbarCommands()
             CommandGroup(replacing: .newItem) {
-                Button("New Item") { model.addItem() }
-                    .keyboardShortcut("n")
+                Button("Open") { model.openSelection() }
+                    .keyboardShortcut(.downArrow, modifiers: .command)
+                    .disabled(model.selection.isEmpty)
+            }
+            CommandMenu("Go") {
+                Button("Back") { model.goBack() }
+                    .keyboardShortcut("[")
+                    .disabled(!model.canGoBack)
+                Button("Forward") { model.goForward() }
+                    .keyboardShortcut("]")
+                    .disabled(!model.canGoForward)
+                Button("Enclosing Folder") { model.goUp() }
+                    .keyboardShortcut(.upArrow, modifiers: .command)
+                    .disabled(!model.canGoUp)
+                Divider()
+                Button("Go to Address…") { model.beginEditingAddress() }
+                    .keyboardShortcut("l")
             }
         }
 
@@ -57,30 +70,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The self-test's result becomes the exit code, after a normal quit.
     func applicationWillTerminate(_ notification: Notification) {
         if SelfTest.requested { exit(SelfTest.exitCode) }
-    }
-}
-
-/// Where the data lives: ~/Library/Application Support/Pane/Pane.store
-enum Store {
-    /// True when APP_STORE points somewhere else (tests, snapshots, seed data).
-    static var isOverridden: Bool {
-        !(ProcessInfo.processInfo.environment["APP_STORE"] ?? "").isEmpty
-    }
-
-    static var url: URL {
-        if let path = ProcessInfo.processInfo.environment["APP_STORE"], !path.isEmpty {
-            return URL(fileURLWithPath: path)
-        }
-        let dir = URL.applicationSupportDirectory.appending(path: "Pane", directoryHint: .isDirectory)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "Pane.store")
-    }
-
-    static func makeContainer() -> ModelContainer {
-        do {
-            return try ModelContainer(for: Item.self, configurations: ModelConfiguration(url: url))
-        } catch {
-            fatalError("Could not open the database at \(url.path): \(error)")
-        }
     }
 }

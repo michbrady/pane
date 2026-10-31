@@ -1,0 +1,37 @@
+import Foundation
+import PaneKit
+
+/// One folder in the Navigation pane. Subfolders load the first time a row
+/// asks for them, so a folder with 10,000 children costs nothing until opened.
+final class NavNode: Identifiable {
+    let id: String
+    let url: URL
+    let name: String
+    private let prefix: String
+    private var loaded = false
+    private var cached: [NavNode]?
+
+    /// `prefix` keeps ids apart when one folder shows in two places ("quick:", "home:", "vol:").
+    init(url: URL, prefix: String, name: String? = nil) {
+        self.url = url.standardizedFileURL
+        self.prefix = prefix
+        self.id = prefix + self.url.path
+        self.name = name ?? Locations.displayName(for: url)
+    }
+
+    /// Subfolders, or nil when there are none (no disclosure arrow).
+    var children: [NavNode]? {
+        if !loaded {
+            loaded = true
+            let items = (try? FolderLister.list(url)) ?? []
+            let folders = items.filter(\.isFolder).map { NavNode(url: $0.url, prefix: prefix) }
+            cached = folders.isEmpty ? nil : folders
+        }
+        return cached
+    }
+
+    func invalidate() {
+        loaded = false
+        cached = nil
+    }
+}

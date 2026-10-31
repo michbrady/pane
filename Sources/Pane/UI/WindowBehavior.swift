@@ -75,3 +75,20 @@ private struct WindowHook: NSViewRepresentable {
         }
     }
 }
+
+/// Saves and restores the window's size and place between launches.
+struct FrameAutosave: NSViewRepresentable {
+    let name: String
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            // Tests and snapshots keep the default size.
+            guard !Locations.isOverridden else { return }
+            view.window?.setFrameAutosaveName(name)
+        }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {}
+}

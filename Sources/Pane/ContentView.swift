@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 struct ContentView: View {
@@ -7,85 +6,83 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            sidebar
-        } content: {
-            ItemList(page: model.sidebar ?? .all)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 320)
+            NavigationPane()
+                .navigationSplitViewColumnWidth(
+                    min: Layout.navigationMin, ideal: Layout.navigationIdeal, max: Layout.navigationMax)
         } detail: {
-            ItemDetail()
+            FolderPage()
         }
+        .navigationTitle(model.currentName)
+        .noInitialFocus()
+        .background(FrameAutosave(name: "PaneMain"))
         .task {
-            SeedData.insertIfRequested(into: model)
             SelfTest.runIfRequested(model: model)
             Snapshot.runIfRequested(model: model, openSettings: openSettings)
         }
     }
+}
 
-    private var sidebar: some View {
-        @Bindable var model = model
-        return List(SidebarItem.allCases, selection: $model.sidebar) { page in
-            Label(page.title, systemImage: page.symbol)
-                .tag(page)
+/// The content column: Address bar, Details view, Status bar, and the Command bar.
+struct FolderPage: View {
+    @Environment(AppModel.self) private var model
+    @State private var search = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            AddressBar()
+            Divider()
+            DetailsView()
+            Divider()
+            StatusBar()
         }
-        .navigationSplitViewColumnWidth(min: 180, ideal: 212)
+        // The Search box and the Command bar show their place now. Search (S-030)
+        // and the commands (S-041) come in later stories, so they stay dimmed.
+        .background {
+            // F4 focuses the Address bar, like Explorer. Cmd-L is in the Go menu.
+            Button("Go to Address") { model.beginEditingAddress() }
+                .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF4FunctionKey)!)), modifiers: [])
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
+        .searchable(text: $search, prompt: "Search")
+        .toolbar { CommandBar() }
     }
 }
 
-struct ItemList: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.modelContext) private var context
-    @Query(sort: \Item.createdAt, order: .reverse) private var items: [Item]
-    let page: SidebarItem
-
-    private var visible: [Item] {
-        page == .starred ? items.filter(\.isStarred) : items
-    }
-
-    var body: some View {
-        @Bindable var model = model
-        List(visible, selection: $model.selection) { item in
-            Label(item.title, systemImage: item.isStarred ? "star.fill" : "circle")
-                .tag(item.id)
-                .contextMenu {
-                    Button("Delete", role: .destructive) { context.delete(item) }
-                }
-        }
-        .overlay {
-            if visible.isEmpty {
-                ContentUnavailableView(
-                    "No Items",
-                    systemImage: page.symbol,
-                    description: Text("Press Command-N to add one.")
-                )
+/// Explorer's Command bar as the window toolbar. Items dim until their stories land.
+private struct CommandBar: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarItemGroup {
+            Menu("New", systemImage: "plus") {
+                Button("Folder") {}
+                Button("File") {}
             }
+            .help("Make a new folder or file (⇧⌘N)")
+            .disabled(true)
+            Button("Cut", systemImage: "scissors") {}
+                .help("Cut the selected items (⌘X)")
+                .disabled(true)
+            Button("Copy", systemImage: "doc.on.doc") {}
+                .help("Copy the selected items (⌘C)")
+                .disabled(true)
+            Button("Paste", systemImage: "doc.on.clipboard") {}
+                .help("Paste the items here (⌘V)")
+                .disabled(true)
+            Button("Rename", systemImage: "pencil") {}
+                .help("Rename the selected item (F2)")
+                .disabled(true)
+            Button("Move to Trash", systemImage: "trash") {}
+                .help("Move the selected items to the Trash (⌫)")
+                .disabled(true)
         }
-        .navigationTitle(page.title)
-        .toolbar {
-            ToolbarItem {
-                Button("New Item", systemImage: "plus") { model.addItem() }
-                    .help("Add an item (Command-N)")
-            }
+        ToolbarSpacer(.fixed)
+        ToolbarItemGroup {
+            Menu("Sort", systemImage: "arrow.up.arrow.down") {}
+                .help("Choose how items are ordered")
+                .disabled(true)
+            Menu("View", systemImage: "list.bullet") {}
+                .help("Choose how items are shown")
+                .disabled(true)
         }
-    }
-}
-
-struct ItemDetail: View {
-    @Environment(AppModel.self) private var model
-    @Query private var items: [Item]
-
-    var body: some View {
-        if let item = items.first(where: { $0.id == model.selection }) {
-            @Bindable var item = item
-            Form {
-                TextField("Title", text: $item.title)
-                Toggle("Starred", isOn: $item.isStarred)
-                TextField("Notes", text: $item.notes, axis: .vertical)
-                    .lineLimit(4...)
-            }
-            .formStyle(.grouped)
-            } else {
-            ContentUnavailableView("No Selection", systemImage: "sidebar.right")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
     }
 }
