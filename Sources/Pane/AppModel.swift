@@ -47,7 +47,8 @@ final class AppModel {
 
     // File operations
     private(set) var clipboard = Clipboard()
-    private let operations = FileOperations(LocalFileSystem())
+    private let operations = FileOperations(LocalFileSystem(
+        trashFolder: Locations.isOverridden ? Locations.home.appending(path: ".Trash", directoryHint: .isDirectory) : nil))
     /// The running copy or move. A sheet shows it once it takes more than a second.
     private(set) var progress: OperationProgress?
     private(set) var progressTitle = ""
@@ -55,6 +56,10 @@ final class AppModel {
     private var operationTask: Task<Void, Never>?
     /// A name conflict waiting for the person's choice.
     private(set) var pendingConflict: PendingConflict?
+    /// Items waiting for the person to confirm Delete Immediately.
+    var pendingDelete: [URL]?
+    /// After Trash, select the item that moved up into the gap.
+    private var pendingSelection: (index: Int, removed: Set<URL>)?
     /// A message for an alert, after something failed.
     var alertMessage: String?
 
@@ -251,6 +256,31 @@ final class AppModel {
         pendingConflict = nil
     }
 
+    // MARK: Trash and delete
+
+    func trashSelection() {
+        let urls = Array(selection)
+        guard !urls.isEmpty, operationTask == nil, editingText == nil else { return }
+        pendingSelection = items.firstIndex { selection.contains($0.url) }.map { ($0, Set(urls)) }
+        run(title: "Moving to Trash") { [self] in await operations.trash(urls) } finished: { $0 }
+    }
+
+    /// Shift-Delete asks first, because this cannot be undone.
+    func askDeleteImmediately() {
+        guard !selection.isEmpty, editingText == nil else { return }
+        pendingDelete = Array(selection)
+    }
+
+    func deleteImmediately() {
+        guard let urls = pendingDelete, operationTask == nil else { return }
+        pendingDelete = nil
+        pendingSelection = items.firstIndex { urls.contains($0.url) }.map { ($0, Set(urls)) }
+        run(title: "Deleting") { [self] in
+            OperationResult(record: OperationRecord(name: "Delete Immediately", steps: []),
+                            failures: await operations.deleteImmediately(urls))
+        } finished: { $0 }
+    }
+
     /// For snapshots: shows the progress sheet without a long copy.
     func showProgressForSnapshot() {
         progressTitle = "Copying"
@@ -298,6 +328,18 @@ final class AppModel {
                 loadError = nil
                 let still = Set(listed.map(\.url))
                 selection = selection.intersection(still)
+                // After Trash or delete, select the item that moved up. Wait for a listing
+                // where the removed items are gone: the folder watcher can reload early.
+                if let pending = pendingSelection, !listed.isEmpty,
+                   !listed.contains(where: { pending.removed.contains($0.url) }) {
+                    pendingSelection = nil
+                    // The Table drops its selection while it swaps rows, so choose after it settles.
+                    let next = listed[min(pending.index, listed.count - 1)].url
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(80))
+                        if currentFolder == folder { selection = [next] }
+                    }
+                }
             case .failure:
                 items = []
                 loadError = "Unable to read this folder."

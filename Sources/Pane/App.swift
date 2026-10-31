@@ -32,6 +32,13 @@ struct PaneApp: App {
                 Button("Open") { model.openSelection() }
                     .keyboardShortcut(.downArrow, modifiers: .command)
                     .disabled(model.selection.isEmpty)
+                Divider()
+                Button("Move to Trash") { model.trashSelection() }
+                    .keyboardShortcut(.delete, modifiers: .command)
+                    .disabled(model.selection.isEmpty)
+                Button("Delete Immediately…") { model.askDeleteImmediately() }
+                    .keyboardShortcut(.delete, modifiers: .shift)
+                    .disabled(model.selection.isEmpty)
             }
             CommandGroup(replacing: .pasteboard) {
                 Button("Cut") { model.cutSelection() }

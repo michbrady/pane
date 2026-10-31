@@ -21,6 +21,13 @@ struct ContentView: View {
         .sheet(isPresented: .init(get: { model.pendingConflict != nil }, set: { _ in })) {
             ConflictSheet()
         }
+        .confirmationDialog(deleteTitle, isPresented: .init(get: { model.pendingDelete != nil }, set: { if !$0 { model.pendingDelete = nil } }),
+                            titleVisibility: .visible) {
+            Button("Delete Immediately", role: .destructive) { model.deleteImmediately() }
+            Button("Cancel", role: .cancel) { model.pendingDelete = nil }
+        } message: {
+            Text("This cannot be undone.")
+        }
         .alert("Pane", isPresented: .init(get: { model.alertMessage != nil }, set: { if !$0 { model.alertMessage = nil } })) {
             Button("OK") {}
         } message: {
@@ -31,6 +38,15 @@ struct ContentView: View {
             SelfTest.runIfRequested(model: model)
             Snapshot.runIfRequested(model: model, openSettings: openSettings)
         }
+    }
+}
+
+extension ContentView {
+    fileprivate var deleteTitle: String {
+        guard let urls = model.pendingDelete else { return "" }
+        return urls.count == 1
+            ? "Delete \u{201C}\(urls[0].lastPathComponent)\u{201D} Immediately?"
+            : "Delete \(urls.count) Items Immediately?"
     }
 }
 

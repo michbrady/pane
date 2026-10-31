@@ -49,6 +49,16 @@ struct DetailsView: View {
             model.openSelection()
             return .handled
         }
+        .onKeyPress(.delete) {
+            guard !model.selection.isEmpty else { return .ignored }
+            model.trashSelection()
+            return .handled
+        }
+        .onKeyPress(.deleteForward) {
+            guard !model.selection.isEmpty else { return .ignored }
+            model.trashSelection()
+            return .handled
+        }
         .onKeyPress(.escape) {
             model.clearCut()
             return .handled

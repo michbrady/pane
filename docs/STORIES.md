@@ -178,7 +178,8 @@ Acceptance:
 - [unit] Files move to the Trash through `trashItem`.
 - [self] Both keys work. Shift+Delete asks first, then deletes for good.
 - [self] Selection moves to the next item.
-Status: todo
+Note: the Mac Trash and Put Back for files Pane trashes are untested [manual]. Tests use a folder inside the throwaway home as the Trash.
+Status: done
 
 ### S-014 Undo file operations
 As the user, I press Cmd+Z to undo a move, copy, rename, new folder, or trash.

@@ -50,6 +50,13 @@ public struct OperationResult: Sendable {
     public var skipped: [URL] = []
     public var failures: [OperationFailure] = []
     public var wasCancelled = false
+
+    public init(record: OperationRecord, skipped: [URL] = [], failures: [OperationFailure] = [], wasCancelled: Bool = false) {
+        self.record = record
+        self.skipped = skipped
+        self.failures = failures
+        self.wasCancelled = wasCancelled
+    }
 }
 
 /// Copy, move, Trash, rename, and new folder, with conflicts and undo records.

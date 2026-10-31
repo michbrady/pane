@@ -141,6 +141,28 @@ enum SelfTest {
                   fm.fileExists(atPath: drop.appending(path: "Notes (2).txt").path)
                   && fm.fileExists(atPath: drop.appending(path: "file2 (2).txt").path))
 
+            // S-013 Move to Trash
+            let trashDir = home.appending(path: ".Trash", directoryHint: .isDirectory)
+            for n in ["a.txt", "b.txt", "c.txt"] { try? Data(n.utf8).write(to: drop.appending(path: "gone-\(n)")) }
+            model.go(to: drop)
+            try? await Task.sleep(for: .seconds(0.4))
+            let firstGone = model.items.firstIndex { $0.name == "gone-b.txt" } ?? 0
+            // Select from the listing, as a click does: listed URLs can spell /tmp as /private/tmp.
+            @MainActor func pick(_ names: String...) { model.selection = Set(model.items.filter { names.contains($0.name) }.map(\.url)) }
+            pick("gone-b.txt")
+            model.trashSelection()
+            try? await Task.sleep(for: .seconds(1))
+            check("Move to Trash removes the item from the folder", !fm.fileExists(atPath: drop.appending(path: "gone-b.txt").path))
+            check("the item is in the Trash", fm.fileExists(atPath: trashDir.appending(path: "gone-b.txt").path))
+            check("selection moves to the next item", model.selection == [model.items[min(firstGone, model.items.count - 1)].url], "selection \(model.selection) items \(model.items.map(\.name)) first \(firstGone)")
+            pick("gone-a.txt")
+            model.askDeleteImmediately()
+            check("Delete Immediately asks first", model.pendingDelete != nil && fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path))
+            model.deleteImmediately()
+            try? await Task.sleep(for: .seconds(1))
+            check("Delete Immediately removes the item for good",
+                  !fm.fileExists(atPath: drop.appending(path: "gone-a.txt").path) && !fm.fileExists(atPath: trashDir.appending(path: "gone-a.txt").path))
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

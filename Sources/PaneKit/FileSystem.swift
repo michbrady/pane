@@ -15,7 +15,12 @@ public protocol FileSystem: Sendable {
 }
 
 public struct LocalFileSystem: FileSystem {
-    public init() {}
+    /// nil uses the Mac's Trash. Tests pass a folder, so they never fill yours.
+    private let trashFolder: URL?
+
+    public init(trashFolder: URL? = nil) {
+        self.trashFolder = trashFolder
+    }
 
     public func exists(_ url: URL) async -> Bool {
         FileManager.default.fileExists(atPath: url.path)
@@ -34,6 +39,17 @@ public struct LocalFileSystem: FileSystem {
     }
 
     public func trash(_ url: URL) async throws -> URL? {
+        if let trashFolder {
+            try FileManager.default.createDirectory(at: trashFolder, withIntermediateDirectories: true)
+            var target = trashFolder.appending(path: url.lastPathComponent)
+            var n = 2
+            while FileManager.default.fileExists(atPath: target.path) {
+                target = trashFolder.appending(path: "\(url.lastPathComponent) \(n)")
+                n += 1
+            }
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
+        }
         var result: NSURL?
         try FileManager.default.trashItem(at: url, resultingItemURL: &result)
         return result as URL?
