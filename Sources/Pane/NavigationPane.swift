@@ -9,6 +9,10 @@ struct NavigationPane: View {
         List(selection: $model.navSelection) {
             Section("Quick access") {
                 ForEach(model.quickRoots) { NavRow(node: $0) }
+                    // A folder dropped between rows is pinned there. Dropped on a row, it moves into that folder.
+                    .dropDestination(for: URL.self) { urls, index in
+                        for (offset, url) in urls.enumerated() { model.pin(url, at: index + offset) }
+                    }
             }
             Section("This Mac") {
                 ForEach(model.thisMacRoots) { NavRow(node: $0) }
@@ -47,6 +51,13 @@ private struct NavRow: View {
         }
         .tag(node.id)
         .acceptsFileDrops(into: node.url, model: model)
+        .contextMenu {
+            if model.isPinned(node.url) {
+                Button("Unpin from Quick access") { model.unpin(node.url) }
+            } else {
+                Button("Pin to Quick access") { model.pin(node.url) }
+            }
+        }
         .help("Show folders inside \(node.name)")
     }
 

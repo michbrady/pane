@@ -274,7 +274,8 @@ Depends: S-007
 Acceptance:
 - [unit] Pins save by bookmark so renamed folders still resolve.
 - [self] Desktop, Downloads, Documents, Pictures are pinned at first.
-Status: todo
+Note: pin and unpin from the context menu are tested. Dropping a folder between Quick access rows to pin it is built but not tried with a real drag [manual].
+Status: done
 
 ### S-026 Open tabs
 As the user, I press Cmd+T for a tab, Cmd+W to close, Ctrl+Tab to cycle, and Cmd+1-9 to jump.

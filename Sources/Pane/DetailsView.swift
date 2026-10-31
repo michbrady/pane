@@ -53,6 +53,13 @@ struct DetailsView: View {
                 Button("Open") { model.tab.open(Array(urls)) }
                 if urls.count == 1 {
                     Button("Rename") { model.actions.beginRename() }
+                    if let folder = model.tab.items.first(where: { urls.contains($0.url) && $0.isFolder }) {
+                        if model.isPinned(folder.url) {
+                            Button("Unpin from Quick access") { model.unpin(folder.url) }
+                        } else {
+                            Button("Pin to Quick access") { model.pin(folder.url) }
+                        }
+                    }
                 }
             }
         } primaryAction: { urls in

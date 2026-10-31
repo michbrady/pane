@@ -224,6 +224,43 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(item("README").displayName(showExtensions: false) == "README")
 }
 
+@Test func pinsKeepOrderAndIgnoreDuplicates() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-pins-\(UUID().uuidString)")
+    for name in ["a", "b", "c"] { try FileManager.default.createDirectory(at: root.appending(path: name), withIntermediateDirectories: true) }
+    defer { try? FileManager.default.removeItem(at: root) }
+    var pins = PinStore(saved: nil, defaults: [root.appending(path: "a")])
+    pins.pin(root.appending(path: "b"))
+    pins.pin(root.appending(path: "b"))
+    pins.pin(root.appending(path: "c"), at: 0)
+    #expect(pins.urls.map(\.lastPathComponent) == ["c", "a", "b"])
+    pins.unpin(root.appending(path: "a"))
+    #expect(pins.urls.map(\.lastPathComponent) == ["c", "b"])
+    #expect(pins.contains(root.appending(path: "c")) && !pins.contains(root.appending(path: "a")))
+}
+
+@Test func aPinnedFolderStillResolvesAfterItIsRenamed() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-rename-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root.appending(path: "Projects"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    var pins = PinStore(saved: nil, defaults: [])
+    pins.pin(root.appending(path: "Projects"))
+    try FileManager.default.moveItem(at: root.appending(path: "Projects"), to: root.appending(path: "Work"))
+    #expect(pins.urls.map(\.lastPathComponent) == ["Work"])
+    let reloaded = PinStore(saved: pins.bookmarks, defaults: [])
+    #expect(reloaded.urls.map(\.lastPathComponent) == ["Work"])
+}
+
+@Test func filesAndMissingFoldersCannotBePinned() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-pinfile-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try Data("x".utf8).write(to: root.appending(path: "file.txt"))
+    var pins = PinStore(saved: nil, defaults: [])
+    pins.pin(root.appending(path: "file.txt"))
+    pins.pin(root.appending(path: "missing"))
+    #expect(pins.urls.isEmpty)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

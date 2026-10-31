@@ -285,6 +285,24 @@ enum SelfTest {
             check("the settings are saved", ViewSettings().showExtensions == false)
             model.view.reset()
 
+            // S-025 Pin folders to Quick access
+            check("Desktop, Downloads, Documents, and Pictures are pinned at first",
+                  model.quickRoots.map(\.name) == ["Desktop", "Downloads", "Documents", "Pictures"], "\(model.quickRoots.map(\.name))")
+            let pinned = home.appending(path: "Projects", directoryHint: .isDirectory)
+            try? fm.createDirectory(at: pinned, withIntermediateDirectories: true)
+            model.pin(pinned)
+            check("Pin adds a Quick access row", model.quickRoots.last?.name == "Projects" && model.isPinned(pinned))
+            check("pinning twice adds one row", { model.pin(pinned); return model.quickRoots.filter { $0.name == "Projects" }.count == 1 }())
+            let moved = home.appending(path: "Work 2", directoryHint: .isDirectory)
+            try? fm.moveItem(at: pinned, to: moved)
+            model.tab.go(to: docs)
+            model.tab.go(to: drop)
+            try? await Task.sleep(for: .seconds(0.4))
+            check("a pinned folder that was renamed still shows, under its new name", model.quickRoots.last?.name == "Work 2", "\(model.quickRoots.map(\.name))")
+            model.unpin(moved)
+            check("Unpin removes the row", !model.quickRoots.contains { $0.name == "Work 2" })
+            check("pins are saved", Prefs.defaults.array(forKey: "pane.pins") != nil)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

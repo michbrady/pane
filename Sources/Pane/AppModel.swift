@@ -11,7 +11,8 @@ final class AppModel {
     let actions = FileActions()
 
     // Navigation pane
-    let quickRoots: [NavNode]
+    private(set) var quickRoots: [NavNode]
+    private var pins: PinStore
     let thisMacRoots: [NavNode]
     var expanded: Set<String> {
         didSet { Prefs.defaults.set(Array(expanded), forKey: "pane.expanded") }
@@ -33,7 +34,9 @@ final class AppModel {
     }
     init() {
         let defaults = Prefs.defaults
-        quickRoots = Locations.quickAccess.map { NavNode(url: $0, prefix: "quick:") }
+        let store = PinStore(saved: defaults.array(forKey: "pane.pins") as? [Data], defaults: Locations.quickAccess)
+        pins = store
+        quickRoots = store.urls.map { NavNode(url: $0, prefix: "quick:") }
         thisMacRoots = [NavNode(url: Locations.home, prefix: "home:")]
             + Locations.volumes.map { NavNode(url: $0, prefix: "vol:") }
         expanded = Set(defaults.stringArray(forKey: "pane.expanded") ?? [])
@@ -53,6 +56,7 @@ final class AppModel {
         view.onChange = { [unowned self] in tab.viewSettingsChanged() }
         tab.didNavigate = { [unowned self] in
             isEditingAddress = false
+            refreshPins()
             syncTree()
             Prefs.defaults.set(tab.currentFolder.path, forKey: "pane.folder")
         }
@@ -63,6 +67,33 @@ final class AppModel {
     /// Cut and Copy work on a selection, or on the text in the Address bar.
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
+
+    // MARK: Quick access
+
+    func isPinned(_ url: URL) -> Bool { pins.contains(url) }
+
+    func pin(_ url: URL, at index: Int? = nil) {
+        pins.pin(url, at: index)
+        pinsChanged()
+    }
+
+    func unpin(_ url: URL) {
+        pins.unpin(url)
+        pinsChanged()
+    }
+
+    private func pinsChanged() {
+        Prefs.defaults.set(pins.bookmarks, forKey: "pane.pins")
+        refreshPins()
+        syncTree()
+    }
+
+    /// Rebuilds the Quick access rows when a pinned folder was renamed or moved.
+    private func refreshPins() {
+        let urls = pins.urls
+        guard urls.map(\.path) != quickRoots.map(\.url.path) else { return }
+        quickRoots = urls.map { NavNode(url: $0, prefix: "quick:") }
+    }
 
     // MARK: Navigation pane
 
