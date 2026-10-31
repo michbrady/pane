@@ -25,3 +25,7 @@ where Windows users look for them and Apple has no term.
 | Cut / Copy / Paste | Windows-style move and copy of items | move here |
 | Rename | Change an item's name | edit name |
 | Full Disk Access | The macOS permission Pane asks for to read protected folders | permission, access |
+| Connection | A saved server or bucket: protocol, host, user name | account, site, bookmark, remote |
+| Connect to Server | The command and sheet that opens a connection | Add Server, Map Network Drive |
+| Server | An SMB, FTP, or SFTP host | host (only the field label), machine |
+| Bucket | An S3 container of items | drive, volume |

@@ -15,13 +15,14 @@ Finder, and the Windows Explorer habits Finder breaks (cut to move, Return to op
 - Settings: view mode, sort, columns per folder, pinned Quick access folders, open tabs, shortcut choices.
 
 ## Shape
-Sidebar window (tree on the left, content on the right, optional preview pane, status bar), macOS 26 or later. Local data. Works offline. No accounts. Not sandboxed, notarized, outside the Mac App Store, with Full Disk Access granted by the user.
+Sidebar window (tree on the left, content on the right, optional preview pane, status bar), macOS 26 or later. Local data, plus the servers the user connects to. Works offline for local folders. No accounts. Not sandboxed, notarized, outside the Mac App Store, with Full Disk Access granted by the user.
 
 ## System hooks
 - Optional default for opening folders and "Reveal in Finder" from other apps (`NSFileViewer`, `public.folder`). Finder keeps the Desktop, Trash UI, AirDrop and Put Back.
 - Global shortcut to open a Pane window (like Win+E).
 - Quick Look, tags, Spotlight search.
 - Network and cloud: connect to SMB servers, browse mounted shares, and use iCloud Drive, Dropbox, Google Drive and OneDrive folders the system provides.
+- Remote servers with Pane's own client: FTP (and FTP with TLS), SFTP, and S3 (including S3-compatible services). Passwords and keys live in the Keychain.
 
 ## Reference
 None. Windows 11 File Explorer cannot be opened on this Mac. Layout and shortcuts come from `docs/research/explorer-style-file-manager.md`.
@@ -38,4 +39,4 @@ Native Mac chrome (system sidebar, toolbar, Liquid Glass, system fonts) arranged
 - Dual pane and Drop Stack.
 - Windows 11 Tiles and Content views (Details, List and Icons only).
 - Zip browsing and batch rename (system extract still works).
-- Undecided, waiting on the user: FTP, SFTP and S3. They need Pane's own client, because macOS no longer mounts FTP.
+- WebDAV and other remote protocols, and two-way folder sync.

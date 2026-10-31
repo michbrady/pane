@@ -2,12 +2,12 @@
 
 Snapshot pages (named for `Screens:`): `window` (default window), `details`
 (Details view), `tree`, `tabs`, `conflict` (copy conflict sheet),
-`properties`, `preview`, `connect` (Connect to Server), `search`, `context-menu`, `settings`,
+`properties`, `preview`, `connect` (Connect to Server), `connections` (saved servers and buckets), `search`, `context-menu`, `settings`,
 `onboarding` (Full Disk Access), `empty-folder`.
 
 Decisions (agent): Cmd+1-9 go to tab N. View modes are Ctrl+Cmd+1/2/3.
 Cmd+Shift+3-5 and F11 are not bound. Delete and Cmd+Delete both trash.
-Backspace does nothing. Return opens, F2 renames. SMB and cloud storage are in version one (M5). FTP, SFTP, S3 wait on a user decision.
+Backspace does nothing. Return opens, F2 renames. SMB and cloud storage are in version one (M5). FTP, SFTP and S3 are in version one too (M6), decided by the user.
 
 ## M1 Browse
 
@@ -430,7 +430,98 @@ Acceptance:
 - [self] Terminal opens at that folder.
 Status: todo
 
-## M6 Polish
+
+## M6 Remote servers
+
+Remote places browse like folders. One `RemoteFileSystem` protocol in `PaneKit` has three providers (FTP, SFTP, S3) and a fake one for tests. The UI works on the protocol, so the Details view, tree, and Address bar never ask which kind it is.
+
+### S-060 Browse a remote place like a folder
+As the user, I open a connection and see its folders and files in the Details view, with the same columns, sorting, and Address bar.
+Screens: details, connections
+Depends: S-046, S-020
+Acceptance:
+- [unit] A fake provider lists folders first, then files in natural order, through the same code as local folders.
+- [snap] The Address bar shows a remote path as `sftp://host/path` in the breadcrumbs, and the tree lists the connection under "Connections".
+- [self] Listing runs in the background and shows "Loading…" after half a second, with Cancel.
+- [self] A lost connection shows "Connection lost." with a "Reconnect" button and keeps the last listing dimmed.
+Status: todo
+
+### S-061 Connect to an FTP server
+As the user, I add an FTP server with host, port, name and password and browse it.
+Screens: connections
+Depends: S-060
+Acceptance:
+- [snap] The sheet has Protocol (FTP, FTP with TLS), Host, Port, User name, Password, and "Remember this password in my Keychain".
+- [self] Plain FTP shows a note: "FTP sends your password without encryption." with "FTP with TLS" as the first choice.
+- [manual] Listing, passive mode, and a UTF-8 name work against a real server. [U] Test against vsftpd and a hosting provider.
+- [unit] Unix and Windows (IIS) directory listings both parse into names, sizes, and dates.
+Status: todo
+
+### S-062 Connect to an SFTP server
+As the user, I add an SFTP server and sign in with a password or a key from `~/.ssh`, and browse it.
+Screens: connections
+Depends: S-060
+Acceptance:
+- [snap] The sheet has Host, Port, User name, and a choice of Password or Key with a file picker.
+- [self] A host key I have not seen asks "Trust this server?" with its fingerprint. A changed key stops with a warning.
+- [manual] A key with a passphrase asks for it once and keeps it in the Keychain on request. [U] Decide the library: libssh2, or the system `sftp`. Test both for speed on 10,000 files.
+- [unit] Remote paths with spaces and non-ASCII names round-trip.
+Status: todo
+
+### S-063 Browse an S3 bucket
+As the user, I add an S3 account with an access key and secret, pick a bucket, and browse its prefixes as folders.
+Screens: connections
+Depends: S-060
+Acceptance:
+- [snap] The sheet has Access key, Secret key, Region, optional Endpoint (for S3-compatible services like R2 or MinIO), and "Remember in my Keychain".
+- [unit] Requests are signed with Signature Version 4. A fixed test vector from the AWS docs gives the expected signature.
+- [unit] A listing with a `/` delimiter turns common prefixes into folders and keys into files, and follows `NextContinuationToken` past 1,000 keys.
+- [self] A wrong key shows "Access denied." under the field.
+- [manual] Browse a real bucket and a MinIO bucket.
+Status: todo
+
+### S-064 Copy between this Mac and a remote place
+As the user, I copy, cut, paste, or drag files between local and remote folders, and both ways.
+Depends: S-060, S-011, S-017
+Acceptance:
+- [unit] A fake provider receives an upload and returns a download that matches byte for byte.
+- [self] A progress sheet shows the file, speed, and time left, with Cancel. A cancelled upload leaves no half file.
+- [self] A conflict opens the same Replace, Skip, Decide sheet as local copies (S-012).
+- [self] Cut from a remote place deletes the source only after the copy succeeds.
+- [manual] A 1 GB file moves without freezing the window.
+Status: todo
+
+### S-065 Change files on a remote place
+As the user, I rename, delete, and make folders on a remote place.
+Depends: S-060, S-015, S-016
+Acceptance:
+- [unit] Each action calls the provider and the listing updates.
+- [self] Delete asks first: "Delete 3 items from <server>? This cannot be undone." with "Delete" and "Cancel", because remote places have no Trash.
+- [self] Rename and New folder use the same F2 and Cmd+Shift+N as local folders.
+Status: todo
+
+### S-066 Open and edit a remote file
+As the user, I press Return on a remote file to open it, and changes I save go back to the server.
+Depends: S-064
+Acceptance:
+- [self] The file downloads to a temporary folder, shows progress, and opens in its default app.
+- [self] Saving in that app uploads the change, and the Status bar says "Uploaded Notes.txt".
+- [self] A changed file on the server since download asks before it overwrites.
+- [unit] Temporary copies are deleted when Pane quits.
+Status: todo
+
+### S-067 Save connections
+As the user, I save a server or bucket once and open it from the tree.
+Screens: connections, tree
+Depends: S-061
+Acceptance:
+- [snap] "Connections" in the Navigation pane lists saved places with a protocol icon, and "Connect to Server…" has a "Manage Connections" view.
+- [unit] Passwords and secret keys live in the Keychain only. Settings hold the host, user name, and protocol.
+- [self] Edit and Remove work. Removing a connection also deletes its Keychain item.
+- [self] A saved connection that is offline shows a dimmed row with "Unable to connect." when clicked.
+Status: todo
+
+## M7 Polish
 
 ### S-050 Use context menus
 As the user, I right-click to see a short menu with icon row (Cut, Copy, Rename, Delete) and a "Show more" list.
@@ -477,8 +568,9 @@ Status: todo
 
 ## Later
 - Dual pane and Drop Stack.
-- FTP, SFTP and S3 (waiting on a user decision, see the brief).
 - Zip browsing, batch rename.
 - Tiles and Content views.
 - Compare dialog inside the conflict sheet.
 - Cloud features beyond folders the system provides: sharing links, selective sync, version history.
+- Other remote protocols: WebDAV, Google Cloud Storage, Azure Blob, Backblaze B2 native API (B2 works through its S3 endpoint).
+- Background sync and two-way folder sync with remote places.

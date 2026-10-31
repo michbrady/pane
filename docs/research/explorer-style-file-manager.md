@@ -143,6 +143,11 @@ Patterns:
     one-time price. Verify ForkLift and Commander One prices first.
 
 ## Open questions
+- Remote servers are now version one (user decision, M6). Test before building:
+  - SFTP library: libssh2 through Swift Package Manager, or the system `/usr/bin/sftp`. Measure listing 10,000 files and a 1 GB transfer with each.
+  - FTP: `URLSession` supports `ftp://` downloads and uploads but not directory listings, so the app parses `LIST` output itself over `Network.framework`. Test passive mode, FTP with TLS, and IIS listings. [U]
+  - S3: sign requests with Signature Version 4 using CryptoKit, and list with `ListObjectsV2`. Check it against R2, MinIO, and Backblaze B2 endpoints. [U]
+  - Cloud folders: confirm iCloud Drive, Dropbox, Google Drive, and OneDrive appear under `~/Library/CloudStorage` on macOS 26, and how online-only files report their state. [U]
 - Does `NSFileViewer` still work on macOS 26, and does `LSHandlers` survive a
   Launch Services rebuild? Test: set it, reboot, run
   `lsregister -kill -r -domain local -domain user`, then reveal a file from
