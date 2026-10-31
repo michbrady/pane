@@ -3,6 +3,14 @@ import Foundation
 import Observation
 import PaneKit
 
+/// A pasted item whose name is already taken. `continuation` resumes the paste.
+struct PendingConflict {
+    let conflict: Conflict
+    let incoming: FolderItem?
+    let existing: FolderItem?
+    let continuation: CheckedContinuation<ConflictDecision, Never>?
+}
+
 /// App-wide state that menus, toolbars, and views share.
 @Observable
 final class AppModel {
@@ -45,6 +53,8 @@ final class AppModel {
     private(set) var progressTitle = ""
     private(set) var progressVisible = false
     private var operationTask: Task<Void, Never>?
+    /// A name conflict waiting for the person's choice.
+    private(set) var pendingConflict: PendingConflict?
     /// A message for an alert, after something failed.
     var alertMessage: String?
 
@@ -186,7 +196,7 @@ final class AppModel {
         let mode: PasteMode = clipboard.isCutActive ? .move : .copy
         run(title: mode == .copy ? "Copying" : "Moving") { [self] in
             await operations.paste(sources, into: currentFolder, mode: mode,
-                                   resolve: { _ in ConflictDecision(choice: .skip) },
+                                   resolve: { [self] conflict in await askConflict(conflict) },
                                    progress: { p in Task { @MainActor in self.progress = p } })
         } finished: { [self] result in
             if mode == .move { clipboard.clearCut() }
@@ -213,6 +223,32 @@ final class AppModel {
             report(result)
             reload()
         }
+    }
+
+    private func askConflict(_ conflict: Conflict) async -> ConflictDecision {
+        await withCheckedContinuation { continuation in
+            pendingConflict = PendingConflict(
+                conflict: conflict,
+                incoming: FolderLister.item(at: conflict.source),
+                existing: FolderLister.item(at: conflict.existing),
+                continuation: continuation)
+        }
+    }
+
+    func resolveConflict(_ choice: ConflictChoice, applyToAll: Bool) {
+        guard let pending = pendingConflict else { return }
+        pendingConflict = nil
+        pending.continuation?.resume(returning: ConflictDecision(choice: choice, applyToAll: applyToAll))
+    }
+
+    func showConflictForSnapshot(incoming: URL, existing: URL) {
+        pendingConflict = PendingConflict(
+            conflict: Conflict(source: incoming, existing: existing, isFolder: false),
+            incoming: FolderLister.item(at: incoming), existing: FolderLister.item(at: existing), continuation: nil)
+    }
+
+    func hideConflictForSnapshot() {
+        pendingConflict = nil
     }
 
     /// For snapshots: shows the progress sheet without a long copy.

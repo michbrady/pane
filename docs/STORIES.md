@@ -161,14 +161,15 @@ Note: moving across volumes uses `FileManager.moveItem`, which copies then remov
 Status: done
 
 ### S-012 Resolve name conflicts
-As the user, when a pasted file's name exists, I choose Replace, Skip, or Let me decide.
+As the user, when a pasted file's name exists, I choose Replace, Skip, or Keep Both.
 Screens: conflict
 Depends: S-010
 Acceptance:
-- [snap] The sheet shows both files with size and date, and Replace, Skip, Decide choices.
+- [snap] The sheet shows both files with size and date, and Replace, Skip, Keep Both and Cancel. Skip is the default button.
 - [unit] "Do this for all" applies to the rest of the batch.
 - [unit] Skip leaves both files untouched. Replace never loses the original if the copy fails.
-Status: todo
+Note: Keep Both replaces the "Let me decide" choice from the first draft.
+Status: done
 
 ### S-013 Delete to the Trash
 As the user, I press Delete or Cmd+Delete to trash the selection.

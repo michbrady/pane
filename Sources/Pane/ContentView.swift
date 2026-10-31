@@ -1,3 +1,4 @@
+import PaneKit
 import SwiftUI
 
 struct ContentView: View {
@@ -14,8 +15,11 @@ struct ContentView: View {
         }
         .navigationTitle(model.currentName)
         .noInitialFocus()
-        .sheet(isPresented: .init(get: { model.progressVisible }, set: { _ in })) {
+        .sheet(isPresented: .init(get: { model.progressVisible && model.pendingConflict == nil }, set: { _ in })) {
             OperationSheet()
+        }
+        .sheet(isPresented: .init(get: { model.pendingConflict != nil }, set: { _ in })) {
+            ConflictSheet()
         }
         .alert("Pane", isPresented: .init(get: { model.alertMessage != nil }, set: { if !$0 { model.alertMessage = nil } })) {
             Button("OK") {}
@@ -122,5 +126,71 @@ struct OperationSheet: View {
     private var title: String {
         guard let p = model.progress else { return model.progressTitle + "…" }
         return "\(model.progressTitle) \(min(p.done + 1, p.total)) of \(p.total)"
+    }
+}
+
+/// Asks what to do when a pasted item's name is taken: Replace, Skip, or Keep Both.
+struct ConflictSheet: View {
+    @Environment(AppModel.self) private var model
+    @State private var applyToAll = false
+
+    var body: some View {
+        if let pending = model.pendingConflict {
+            VStack(alignment: .leading, spacing: Space.lg) {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Text("\u{201C}\(pending.conflict.existing.lastPathComponent)\u{201D} already exists")
+                        .font(.headline)
+                    Text("Choose what to do with the item you are pasting.")
+                        .foregroundStyle(.secondary)
+                }
+                VStack(spacing: Space.sm) {
+                    ConflictRow(title: "Already here", item: pending.existing)
+                    ConflictRow(title: "Pasting", item: pending.incoming)
+                }
+                Toggle("Do this for all conflicts", isOn: $applyToAll)
+                HStack {
+                    Button("Cancel") { model.resolveConflict(.cancel, applyToAll: false) }
+                        .keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button("Keep Both") { model.resolveConflict(.keepBoth, applyToAll: applyToAll) }
+                    Button("Replace") { model.resolveConflict(.replace, applyToAll: applyToAll) }
+                    // Skip is the default, so a stray Return never overwrites anything.
+                    Button("Skip") { model.resolveConflict(.skip, applyToAll: applyToAll) }
+                        .keyboardShortcut(.defaultAction)
+                }
+            }
+            .padding(Space.xl)
+            .frame(width: Layout.sheetWidth)
+            .noInitialFocus()
+        }
+    }
+}
+
+private struct ConflictRow: View {
+    let title: String
+    let item: FolderItem?
+
+    var body: some View {
+        HStack(spacing: Space.md) {
+            if let item {
+                Image(nsImage: IconCache.icon(for: item.url, isFolder: item.isFolder))
+                    .resizable()
+                    .frame(width: Space.xxl + Space.sm, height: Space.xxl + Space.sm)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).font(.callout.bold())
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(Space.md)
+        .background(Surfaces.field, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+    }
+
+    private var detail: String {
+        guard let item else { return "" }
+        let size = item.size.map(Format.size) ?? "Folder"
+        let date = item.modified.map(Format.date) ?? ""
+        return [size, date].filter { !$0.isEmpty }.joined(separator: "  ")
     }
 }

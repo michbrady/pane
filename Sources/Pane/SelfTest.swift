@@ -110,6 +110,37 @@ enum SelfTest {
             model.copySelection()
             check("Copying something else clears the cut", !model.isCut(again))
 
+            // S-012 Resolve name conflicts
+            let drop = home.appending(path: "Conflicts", directoryHint: .isDirectory)
+            try? fm.createDirectory(at: drop, withIntermediateDirectories: true)
+            try? Data("old".utf8).write(to: drop.appending(path: "Notes.txt"))
+            try? Data("old".utf8).write(to: drop.appending(path: "file2.txt"))
+            model.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.3))
+            model.selection = [docs.appending(path: "Notes.txt")]
+            model.copySelection()
+            model.go(to: drop)
+            model.paste()
+            try? await Task.sleep(for: .seconds(0.5))
+            check("a name conflict asks first", model.pendingConflict != nil)
+            model.resolveConflict(.skip, applyToAll: false)
+            try? await Task.sleep(for: .seconds(0.5))
+            check("Skip leaves the existing file untouched",
+                  (try? String(contentsOf: drop.appending(path: "Notes.txt"), encoding: .utf8)) == "old")
+            model.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.3))
+            model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "file2.txt")]
+            model.copySelection()
+            model.go(to: drop)
+            model.paste()
+            try? await Task.sleep(for: .seconds(0.5))
+            model.resolveConflict(.keepBoth, applyToAll: true)
+            try? await Task.sleep(for: .seconds(0.8))
+            check("Do this for all asks once", model.pendingConflict == nil)
+            check("Keep Both adds a numbered copy",
+                  fm.fileExists(atPath: drop.appending(path: "Notes (2).txt").path)
+                  && fm.fileExists(atPath: drop.appending(path: "file2 (2).txt").path))
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

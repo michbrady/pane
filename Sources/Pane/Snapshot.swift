@@ -12,12 +12,13 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
             model.cancelEditingAddress()
             model.hideProgressForSnapshot()
+            model.hideConflictForSnapshot()
             switch self {
             case .window:
                 model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
@@ -38,6 +39,11 @@ enum Snapshot {
                 model.selection = [docs.appending(path: "Notes.txt"), docs.appending(path: "Budget 2026.xlsx")]
                 model.cutSelection()
                 model.selection = [docs.appending(path: "Trip itinerary.pdf")]
+            case .conflict:
+                let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
+                model.go(to: docs.appending(path: "Work", directoryHint: .isDirectory))
+                model.showConflictForSnapshot(incoming: docs.appending(path: "Notes.txt"),
+                                              existing: docs.appending(path: "Read me first.md"))
             case .progress:
                 model.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.showProgressForSnapshot()

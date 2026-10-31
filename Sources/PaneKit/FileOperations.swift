@@ -7,6 +7,12 @@ public struct Conflict: Sendable {
     public let source: URL
     public let existing: URL
     public let isFolder: Bool
+
+    public init(source: URL, existing: URL, isFolder: Bool) {
+        self.source = source
+        self.existing = existing
+        self.isFolder = isFolder
+    }
 }
 
 public enum ConflictChoice: Sendable { case replace, skip, keepBoth, cancel }
