@@ -368,6 +368,21 @@ enum SelfTest {
             model.view.reset()
             check("reset forgets the layouts", model.view.columns(for: docs)[visibility: "created"] != .visible)
 
+            // S-033 See Properties
+            model.tab.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.4))
+            model.tab.selection = []
+            model.showProperties()
+            check("Properties with no selection shows the folder", model.propertiesURLs?.count == 1 && model.propertiesURLs?.first?.path == model.tab.currentFolder.path)
+            model.closeProperties()
+            model.tab.selection = Set(model.tab.items.filter { $0.name == "Notes.txt" }.map(\.url))
+            model.showProperties()
+            check("Properties shows the selected item", model.propertiesURLs?.first?.lastPathComponent == "Notes.txt")
+            let props = model.propertiesURLs?.first.flatMap(ItemProperties.read)
+            check("a file's properties are read", props?.name == "Notes.txt" && props?.size != nil && props?.location.hasSuffix("/Documents") == true, props?.location ?? "nil")
+            model.closeProperties()
+            check("Done closes the panel", model.propertiesURLs == nil)
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

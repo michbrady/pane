@@ -292,6 +292,45 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(SelectionSummary.text(itemCount: 5, selected: [item("Folder", folder: true)]) == "1 item selected")
 }
 
+@Test func permissionsReadLikeLs() {
+    #expect(ItemProperties.permissionText(0o644) == "rw-r--r--")
+    #expect(ItemProperties.permissionText(0o755) == "rwxr-xr-x")
+    #expect(ItemProperties.permissionText(0o000) == "---------")
+}
+
+@Test func propertiesOfAFileAndAFolder() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-props-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root.appending(path: "sub"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try Data(count: 5000).write(to: root.appending(path: "sub/a.bin"))
+    try Data(count: 300).write(to: root.appending(path: "b.bin"))
+    let file = try #require(ItemProperties.read(root.appending(path: "sub/a.bin")))
+    #expect(file.name == "a.bin" && file.size == 5000 && !file.isFolder)
+    #expect((file.sizeOnDisk ?? 0) >= 5000)
+    #expect(file.location.hasSuffix("/sub") && file.created != nil && file.modified != nil)
+    let folder = try #require(ItemProperties.read(root))
+    #expect(folder.isFolder && folder.size == nil && folder.kind == "File folder")
+    let total = FolderTotal.measure(root)
+    #expect(total.bytes == 5300 && total.files == 2 && total.folders == 1)
+}
+
+@Test func aCancelledFolderTotalStopsEarly() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-cancel-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    for i in 0..<20 { try Data(count: 10).write(to: root.appending(path: "f\(i)")) }
+    #expect(FolderTotal.measure(root, isCancelled: { true }).files == 0)
+}
+
+@Test func aFolderTotalRunsInTheBackground() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-bg-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try Data(count: 123).write(to: root.appending(path: "x"))
+    let total = await FolderTotal.measureInBackground(root)
+    #expect(total.bytes == 123)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

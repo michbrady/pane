@@ -12,7 +12,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -22,6 +22,7 @@ enum Snapshot {
             model.actions.pendingDelete = nil
             model.actions.cancelRename()
             model.view.reset()
+            model.closeProperties()
             model.closeOtherTabs(except: model.tab)
             switch self {
             case .window:
@@ -78,6 +79,15 @@ enum Snapshot {
                 layout[visibility: "created"] = .visible
                 layout[visibility: "tags"] = .visible
                 model.view.setColumns(layout, for: docs)
+            case .properties:
+                let docs = home.appending(path: "Documents", directoryHint: .isDirectory)
+                model.tab.go(to: docs)
+                Task {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    model.tab.selection = Set(model.tab.items.filter { $0.name == "Trip itinerary.pdf" }.map(\.url))
+                    try? await Task.sleep(for: .milliseconds(150))
+                    model.showProperties()
+                }
             case .list:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.view.mode = .list

@@ -20,6 +20,9 @@ struct ContentView: View {
         .sheet(isPresented: .init(get: { model.actions.progressVisible && model.actions.pendingConflict == nil }, set: { _ in })) {
             OperationSheet()
         }
+        .sheet(isPresented: .init(get: { model.propertiesURLs != nil }, set: { if !$0 { model.closeProperties() } })) {
+            if let urls = model.propertiesURLs { PropertiesSheet(model: model, urls: urls) }
+        }
         .sheet(isPresented: .init(get: { model.actions.pendingConflict != nil }, set: { _ in })) {
             ConflictSheet()
         }

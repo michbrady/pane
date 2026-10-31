@@ -343,7 +343,8 @@ Depends: S-002
 Acceptance:
 - [snap] The panel shows name, kind, size on disk, created, modified, and where.
 - [unit] A folder's total size computes in the background with a spinner.
-Status: todo
+Note: Cmd-I shows the selection, or the folder when nothing is selected. With several items it shows their combined size. The full self-test run is recorded with S-034.
+Status: done
 
 ### S-034 Tag files
 As the user, I add and remove Finder tags from the context menu or Properties.

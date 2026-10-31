@@ -13,6 +13,9 @@ final class AppModel {
     var tab: FolderTab { tabs[activeIndex] }
     let actions = FileActions()
 
+    /// The items whose Properties panel is open.
+    private(set) var propertiesURLs: [URL]?
+
     // Navigation pane
     private(set) var quickRoots: [NavNode]
     private var pins: PinStore
@@ -132,6 +135,18 @@ final class AppModel {
     /// Cut and Copy work on a selection, or on the text in the Address bar.
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
+
+    // MARK: Properties
+
+    /// Cmd-I: the selected items, or the folder being shown when nothing is selected.
+    func showProperties() {
+        let urls = Array(tab.selection)
+        propertiesURLs = urls.isEmpty ? [tab.currentFolder] : urls
+    }
+
+    func closeProperties() {
+        propertiesURLs = nil
+    }
 
     // MARK: Quick access
 

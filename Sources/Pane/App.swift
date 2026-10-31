@@ -34,6 +34,8 @@ struct PaneApp: App {
                     .disabled(model.tab.selection.isEmpty)
                 Button("New Folder") { model.actions.newFolder() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
+                Button("Properties") { model.showProperties() }
+                    .keyboardShortcut("i")
                 Button("Rename") { model.actions.beginRename() }
                     .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF2FunctionKey)!)), modifiers: [])
                     .disabled(!model.actions.canRename)
