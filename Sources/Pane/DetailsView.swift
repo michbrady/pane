@@ -7,7 +7,7 @@ struct DetailsView: View {
 
     var body: some View {
         @Bindable var tab = model.tab
-        Table(tab.items, selection: $tab.selection) {
+        Table(of: FolderItem.self, selection: $tab.selection) {
             TableColumn("Name") { item in
                 HStack(spacing: Space.sm) {
                     Image(nsImage: IconCache.icon(for: item.url, isFolder: item.isFolder))
@@ -40,11 +40,11 @@ struct DetailsView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .width(min: 60, ideal: 80)
-        }
-        // Dragging a selected row drags the whole selection, to Finder or to a folder in Pane.
-        .dragContainer(for: URL.self, itemID: \.self) { urls in
-            model.actions.dragStarted(urls)
-            return urls
+        } rows: {
+            ForEach(tab.items) { item in
+                // A row is a file drag: to a folder in the Navigation pane, to Finder, or to another app.
+                TableRow(item).draggable(item.url)
+            }
         }
         // Dropping on empty space drops into the folder being shown.
         .acceptsFileDrops(into: model.tab.currentFolder, model: model)

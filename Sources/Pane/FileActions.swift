@@ -104,7 +104,9 @@ final class FileActions {
     func dropMode(into folder: URL) -> PasteMode {
         let keys = NSEvent.modifierFlags
         // A drag from another app has unknown sources until it lands, so it copies.
-        let same = !dragSources.isEmpty && DropRules.sameVolume(dragSources, as: folder)
+        // A drag from this window starts from the selected rows.
+        let sources = dragSources.isEmpty ? Array(tab.selection) : dragSources
+        let same = !sources.isEmpty && DropRules.sameVolume(sources, as: folder)
         return DropRules.mode(sameVolume: same, option: keys.contains(.option), command: keys.contains(.command))
     }
 
