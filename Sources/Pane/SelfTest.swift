@@ -83,6 +83,33 @@ enum SelfTest {
             check("Copy keeps the original", fm.fileExists(atPath: notes.path))
             check("a copy shows in the list", model.items.contains { $0.name == "Notes.txt" })
 
+            // S-011 Cut and paste to move
+            let moveMe = work.appending(path: "Move me.txt")
+            try? Data("m".utf8).write(to: moveMe)
+            model.go(to: docs)
+            model.go(to: work)
+            try? await Task.sleep(for: .seconds(0.4))
+            model.selection = [moveMe]
+            model.cutSelection()
+            check("Cut leaves the item in place", fm.fileExists(atPath: moveMe.path) && model.isCut(moveMe))
+            model.go(to: docs)
+            try? await Task.sleep(for: .seconds(0.3))
+            check("Cut items stay until paste", fm.fileExists(atPath: moveMe.path))
+            model.paste()
+            try? await Task.sleep(for: .seconds(1))
+            check("Paste moves the item", fm.fileExists(atPath: docs.appending(path: "Move me.txt").path) && !fm.fileExists(atPath: moveMe.path))
+            check("Paste clears the cut", !model.isCut(moveMe))
+            let again = docs.appending(path: "Move me.txt")
+            model.selection = [again]
+            model.cutSelection()
+            model.clearCut()
+            check("Escape clears the cut", !model.isCut(again))
+            model.selection = [again]
+            model.cutSelection()
+            model.selection = [docs.appending(path: "Notes.txt")]
+            model.copySelection()
+            check("Copying something else clears the cut", !model.isCut(again))
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

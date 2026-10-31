@@ -157,7 +157,8 @@ Acceptance:
 - [unit] Cut items stay until paste. Pressing Escape or copying something else clears cut.
 - [unit] Moving across volumes copies then removes the original only after success.
 - [snap] Cut items show faded in the list.
-Status: todo
+Note: moving across volumes uses `FileManager.moveItem`, which copies then removes. Try an external drive by hand [manual].
+Status: done
 
 ### S-012 Resolve name conflicts
 As the user, when a pasted file's name exists, I choose Replace, Skip, or Let me decide.
