@@ -50,7 +50,7 @@ final class AppModel {
             start = Locations.home
         }
         tab = FolderTab(start: start, view: view)
-        view.onChange = { [unowned self] in tab.resort() }
+        view.onChange = { [unowned self] in tab.viewSettingsChanged() }
         tab.didNavigate = { [unowned self] in
             isEditingAddress = false
             syncTree()

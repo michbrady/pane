@@ -40,3 +40,13 @@ public extension FolderItem {
     var sortModified: Date { modified ?? .distantPast }
     var sortSize: Int64 { size ?? -1 }
 }
+
+public extension FolderItem {
+    /// The name as shown. With extensions off, "Budget.xlsx" shows as "Budget". Folders and
+    /// names like ".gitignore" show whole. Renaming and sorting always use the full name.
+    func displayName(showExtensions: Bool) -> String {
+        let ext = (name as NSString).pathExtension
+        guard !showExtensions, !isFolder, !ext.isEmpty, name.count > ext.count + 1 else { return name }
+        return String(name.dropLast(ext.count + 1))
+    }
+}

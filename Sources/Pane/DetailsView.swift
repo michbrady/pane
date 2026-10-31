@@ -16,7 +16,7 @@ struct DetailsView: View {
                     if model.actions.renamingURL == item.url {
                         RenameField(item: item)
                     } else {
-                        Text(item.name)
+                        Text(item.displayName(showExtensions: model.view.showExtensions))
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .help(item.name)

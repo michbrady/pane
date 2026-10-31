@@ -215,6 +215,15 @@ private func item(_ name: String, folder: Bool = false, size: Int64? = nil, modi
     #expect(FolderSorter.sorted(items, key: .kind, ascending: true, foldersFirst: true).map(\.name) == ["a", "b", "c"])
 }
 
+@Test func extensionsCanBeHiddenFromTheDisplayName() {
+    #expect(item("Budget 2026.xlsx").displayName(showExtensions: false) == "Budget 2026")
+    #expect(item("Budget 2026.xlsx").displayName(showExtensions: true) == "Budget 2026.xlsx")
+    #expect(item("report.final.pdf").displayName(showExtensions: false) == "report.final")
+    #expect(item("v1.2", folder: true).displayName(showExtensions: false) == "v1.2")
+    #expect(item(".gitignore").displayName(showExtensions: false) == ".gitignore")
+    #expect(item("README").displayName(showExtensions: false) == "README")
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

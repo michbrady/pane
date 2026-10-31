@@ -14,7 +14,6 @@ final class FolderTab {
     private(set) var isLoading = false
     /// True once a load has taken more than half a second.
     private(set) var isSlow = false
-    var showHidden = false
     /// Runs once after the next listing that includes a change. File actions set it.
     var afterReload: (() -> Void)?
     /// After items are removed, select the one that moved up into the gap.
@@ -25,6 +24,8 @@ final class FolderTab {
 
     let view: ViewSettings
     private let watcher = FolderWatcher()
+    /// Whether the last listing included hidden items.
+    private var listedHidden = false
     private var generation = 0
     private var reloadTask: Task<Void, Never>?
 
@@ -122,7 +123,8 @@ final class FolderTab {
 
     func reload() {
         let folder = currentFolder
-        let hidden = showHidden
+        let hidden = view.showHidden
+        listedHidden = hidden
         generation += 1
         let mine = generation
         isLoading = true
@@ -173,9 +175,10 @@ final class FolderTab {
         FolderSorter.sorted(listed, key: view.sortKey, ascending: view.ascending, foldersFirst: view.foldersFirst)
     }
 
-    /// Orders the current listing again, after the sort or folders-first setting changed.
-    func resort() {
-        items = sorted(items)
+    /// After a view setting changed: list again when hidden items were turned on or off,
+    /// otherwise just order the current listing again.
+    func viewSettingsChanged() {
+        if view.showHidden != listedHidden { reload() } else { items = sorted(items) }
     }
 
     private func scheduleReload() {

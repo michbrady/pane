@@ -264,7 +264,8 @@ Depends: S-002
 Acceptance:
 - [self] Cmd+Shift+. toggles hidden items.
 - [unit] Dotfiles hide by default.
-Status: todo
+Note: both toggles are in the View menu. The Navigation pane tree does not list hidden folders yet.
+Status: done
 
 ### S-025 Pin folders to Quick access
 As the user, I drag a folder to Quick access, or right-click to Pin, and unpin the same way.

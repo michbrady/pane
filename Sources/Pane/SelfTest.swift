@@ -267,6 +267,24 @@ enum SelfTest {
             check("the sort is saved", ViewSettings().sortKey == .name && ViewSettings().ascending == false)
             model.view.reset()
 
+            // S-024 Show extensions and hidden files
+            try? Data("s".utf8).write(to: drop.appending(path: ".secret"))
+            model.tab.go(to: docs)
+            model.tab.go(to: drop)
+            try? await Task.sleep(for: .seconds(0.6))
+            check("hidden items are off by default", !model.tab.items.contains { $0.name == ".secret" })
+            model.view.showHidden = true
+            try? await Task.sleep(for: .seconds(0.8))
+            check("Show Hidden Items lists dotfiles", model.tab.items.contains { $0.name == ".secret" })
+            model.view.showHidden = false
+            try? await Task.sleep(for: .seconds(0.8))
+            check("turning it off hides them again", !model.tab.items.contains { $0.name == ".secret" })
+            model.view.showExtensions = false
+            check("Show File Extensions off drops the extension from the shown name",
+                  model.tab.items.first { $0.name == "Notes.txt" }?.displayName(showExtensions: model.view.showExtensions) == "Notes")
+            check("the settings are saved", ViewSettings().showExtensions == false)
+            model.view.reset()
+
             print(failures == 0 ? "SELFTEST PASS \(count) checks" : "SELFTEST FAIL \(failures) of \(count) checks")
             finish(code: failures == 0 ? 0 : 1)
         }

@@ -55,6 +55,12 @@ struct PaneApp: App {
                 Button("Paste") { model.actions.paste() }
                     .keyboardShortcut("v")
             }
+            CommandGroup(after: .toolbar) {
+                Divider()
+                Toggle("Show Hidden Items", isOn: Binding(get: { model.view.showHidden }, set: { model.view.showHidden = $0 }))
+                    .keyboardShortcut(".", modifiers: [.command, .shift])
+                Toggle("Show File Extensions", isOn: Binding(get: { model.view.showExtensions }, set: { model.view.showExtensions = $0 }))
+            }
             CommandMenu("Go") {
                 Button("Back") { model.tab.goBack() }
                     .keyboardShortcut("[")
