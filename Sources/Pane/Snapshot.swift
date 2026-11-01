@@ -12,7 +12,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -24,6 +24,7 @@ enum Snapshot {
             model.view.reset()
             model.tab.endSearch(reload: false)
             model.closeProperties()
+            model.dismissFullDiskAccessGuide()
             model.closeOtherTabs(except: model.tab)
             switch self {
             case .window:
@@ -98,6 +99,9 @@ enum Snapshot {
                     try? await Task.sleep(for: .milliseconds(300))
                     model.tab.selection = Set(model.tab.items.filter { $0.name == name }.map(\.url))
                 }
+            case .onboarding:
+                model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.showFullDiskAccessGuideForSnapshot()
             case .search, .searchEmpty:
                 model.tab.go(to: home)
                 let text = self == .search ? "budget" : "zzzz"

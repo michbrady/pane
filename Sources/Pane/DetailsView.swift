@@ -180,6 +180,16 @@ enum Format {
 }
 
 enum Permissions {
+    /// True when Pane has Full Disk Access. macOS lets only such an app open its own privacy
+    /// database, so being able to open it is the test.
+    static var hasFullDiskAccess: Bool {
+        let path = NSHomeDirectory() + "/Library/Application Support/com.apple.TCC/TCC.db"
+        let descriptor = open(path, O_RDONLY)
+        guard descriptor >= 0 else { return false }
+        close(descriptor)
+        return true
+    }
+
     static func openFullDiskAccess() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
         NSWorkspace.shared.open(url)

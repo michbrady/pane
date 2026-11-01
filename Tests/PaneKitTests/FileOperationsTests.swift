@@ -440,6 +440,15 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(OpenInTerminal.folder(selected: [folder, file], current: current) == current)
 }
 
+@Test func theFullDiskAccessGuideShowsOnceAndOnlyWhenNeeded() {
+    #expect(FullDiskAccessGuide.shouldShow(granted: false, shownBefore: false))
+    #expect(!FullDiskAccessGuide.shouldShow(granted: true, shownBefore: false))
+    #expect(!FullDiskAccessGuide.shouldShow(granted: false, shownBefore: true))
+    #expect(!FullDiskAccessGuide.shouldShow(granted: true, shownBefore: true))
+    #expect(FullDiskAccessGuide.reason.hasSuffix("about each one."))
+    #expect(!FullDiskAccessGuide.reason.contains("\n"))
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

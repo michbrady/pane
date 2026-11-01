@@ -18,6 +18,18 @@ final class AppModel {
 
     func focusSearch() { searchFocusRequests += 1 }
 
+    /// True while the first-run Full Disk Access screen shows.
+    private(set) var showFullDiskAccessGuide = false
+
+    func dismissFullDiskAccessGuide(openSettings: Bool = false) {
+        showFullDiskAccessGuide = false
+        Prefs.defaults.set(true, forKey: "pane.fdaGuideShown")
+        if openSettings { Permissions.openFullDiskAccess() }
+    }
+
+    /// For snapshots: shows the screen without checking the real permission.
+    func showFullDiskAccessGuideForSnapshot() { showFullDiskAccessGuide = true }
+
     /// The items whose Properties panel is open.
     private(set) var propertiesURLs: [URL]?
 
@@ -73,6 +85,11 @@ final class AppModel {
         activeIndex = active
         for tab in tabs { tab.begin() }
         activated()
+        // Tests and snapshots never ask. A person gets the screen once, if Pane lacks access.
+        if !Locations.isOverridden {
+            showFullDiskAccessGuide = FullDiskAccessGuide.shouldShow(
+                granted: Permissions.hasFullDiskAccess, shownBefore: defaults.bool(forKey: "pane.fdaGuideShown"))
+        }
     }
 
     // MARK: Tabs

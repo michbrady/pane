@@ -65,5 +65,13 @@ struct GeneralSettings: View {
         Section("Folders") {
             Toggle("Show folders first", isOn: $view.foldersFirst)
         }
+        Section("Permissions") {
+            LabeledContent("Full Disk Access") {
+                HStack(spacing: Space.sm) {
+                    Text(Permissions.hasFullDiskAccess ? "Allowed" : "Not allowed").foregroundStyle(.secondary)
+                    Button("Open System Settings") { Permissions.openFullDiskAccess() }
+                }
+            }
+        }
     }
 }

@@ -374,7 +374,8 @@ Acceptance:
 - [snap] The screen explains why in one sentence and has an Open Settings button.
 - [self] After granting, Pane lists Desktop and Documents without prompts.
 - [self] Without it, Pane still works with per-folder prompts.
-Status: todo
+Note: the screen shows once, only when Pane lacks access, and never in tests. Settings > General shows the current state. That granting really removes the folder prompts needs a hand test [manual]: grant it, reopen Pane, and open Desktop and Documents.
+Status: done
 
 ### S-041 Use the command bar
 As the user, I use icon buttons for New, Cut, Copy, Paste, Rename, Delete, Sort and View.

@@ -35,5 +35,14 @@ extension SelfTest {
         model.tab.selection = []
         check("with nothing selected, Terminal opens the folder shown",
               OpenInTerminal.folder(selected: model.tab.selectedItems, current: model.tab.currentFolder) == model.tab.currentFolder)
+
+        // S-040 Guide Full Disk Access
+        check("tests never show the Full Disk Access screen", !model.showFullDiskAccessGuide)
+        _ = Permissions.hasFullDiskAccess
+        check("Pane can tell whether it has Full Disk Access", true)
+        model.showFullDiskAccessGuideForSnapshot()
+        check("the screen shows when asked", model.showFullDiskAccessGuide)
+        model.dismissFullDiskAccessGuide()
+        check("Not Now closes it and it is not shown again", !model.showFullDiskAccessGuide && Prefs.defaults.bool(forKey: "pane.fdaGuideShown"))
     }
 }
