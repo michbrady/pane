@@ -28,7 +28,7 @@ struct ContentView: View {
         .sheet(isPresented: .init(get: { model.showFullDiskAccessGuide }, set: { if !$0 { model.dismissFullDiskAccessGuide() } })) {
             FullDiskAccessSheet(model: model)
         }
-        .sheet(isPresented: .init(get: { model.showConnectSheet }, set: { if !$0 { model.closeConnectSheet() } })) {
+        .sheet(isPresented: .init(get: { model.connections.showConnectSheet }, set: { if !$0 { model.connections.closeConnectSheet() } })) {
             ConnectSheet(model: model)
         }
         .sheet(isPresented: .init(get: { model.propertiesURLs != nil }, set: { if !$0 { model.closeProperties() } })) {

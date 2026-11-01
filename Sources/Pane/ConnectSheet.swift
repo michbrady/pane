@@ -22,21 +22,21 @@ struct ConnectSheet: View {
                 Toggle("Remember this password in my Keychain", isOn: $remember)
             }
             .textFieldStyle(.roundedBorder)
-            if let error = model.connectError {
+            if let error = model.connections.connectError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
                     .font(.callout)
             }
-            if !model.recentServers.items.isEmpty {
+            if !model.connections.recentServers.items.isEmpty {
                 VStack(alignment: .leading, spacing: Space.xs) {
                     HStack {
                         Text("Recent Servers").font(.callout.bold())
                         Spacer()
-                        Button("Clear Recents") { model.clearRecentServers() }
+                        Button("Clear Recents") { model.connections.clearRecentServers() }
                             .buttonStyle(.link)
                             .font(.callout)
                     }
-                    ForEach(model.recentServers.items, id: \.self) { server in
+                    ForEach(model.connections.recentServers.items, id: \.self) { server in
                         Button(server) { address = server }
                             .buttonStyle(.link)
                             .font(.callout)
@@ -44,16 +44,16 @@ struct ConnectSheet: View {
                 }
             }
             HStack {
-                if model.isConnecting {
+                if model.connections.isConnecting {
                     ProgressView().controlSize(.small)
                     Text("Connecting…").foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Cancel") { model.closeConnectSheet() }
+                Button("Cancel") { model.connections.closeConnectSheet() }
                     .keyboardShortcut(.cancelAction)
                 Button("Connect", action: connect)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(model.isConnecting)
+                    .disabled(model.connections.isConnecting)
             }
         }
         .padding(Space.xl)
@@ -62,6 +62,6 @@ struct ConnectSheet: View {
     }
 
     private func connect() {
-        model.connect(address: address, user: user, password: password, remember: remember)
+        model.connections.connect(address: address, user: user, password: password, remember: remember)
     }
 }

@@ -156,44 +156,44 @@ extension SelfTest {
         // S-046 Connect to an SMB server (the mount and the Keychain are fakes)
         let share = c.home.appending(path: "Volumes/NAS", directoryHint: .isDirectory)
         let log = ConnectLog()
-        model.mounter = { address, user, password in
+        model.connections.mounter = { address, user, password in
             log.mounts.append("\(address.host)|\(user ?? "")|\(password ?? "")")
             return .success(share)
         }
-        model.savePassword = { _, server, account in log.saved.append("\(server)/\(account)") }
-        model.savedPassword = { _, _ in "stored-pass" }
-        model.openConnectSheet()
-        check("Connect to Server opens the sheet", model.showConnectSheet)
-        model.connect(address: "nas/photos", user: "", password: "", remember: false)
+        model.connections.savePassword = { _, server, account in log.saved.append("\(server)/\(account)") }
+        model.connections.savedPassword = { _, _ in "stored-pass" }
+        model.connections.openConnectSheet()
+        check("Connect to Server opens the sheet", model.connections.showConnectSheet)
+        model.connections.connect(address: "nas/photos", user: "", password: "", remember: false)
         check("an address without smb:// is rejected and the sheet stays",
-              model.connectError == "The address has to start with smb://." && log.mounts.isEmpty && model.showConnectSheet)
-        model.connect(address: "", user: "", password: "", remember: false)
-        check("an empty address asks for one", model.connectError == "Type a server address, like smb://nas/photos.")
-        model.connect(address: "smb://", user: "", password: "", remember: false)
-        check("an address with no server name says so", model.connectError == "Add the server name after smb://.")
-        model.connect(address: "smb://nas/photos", user: "me", password: "secret", remember: true)
-        await Wait.until { !model.isConnecting && !model.showConnectSheet }
+              model.connections.connectError == "The address has to start with smb://." && log.mounts.isEmpty && model.connections.showConnectSheet)
+        model.connections.connect(address: "", user: "", password: "", remember: false)
+        check("an empty address asks for one", model.connections.connectError == "Type a server address, like smb://nas/photos.")
+        model.connections.connect(address: "smb://", user: "", password: "", remember: false)
+        check("an address with no server name says so", model.connections.connectError == "Add the server name after smb://.")
+        model.connections.connect(address: "smb://nas/photos", user: "me", password: "secret", remember: true)
+        await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
         await settle()
         check("a good address is mounted with the name and password", log.mounts == ["nas|me|secret"], "\(log.mounts)")
-        check("the sheet closes and the share is shown", !model.showConnectSheet && model.tab.currentFolder.path == share.standardizedFileURL.path)
+        check("the sheet closes and the share is shown", !model.connections.showConnectSheet && model.tab.currentFolder.path == share.standardizedFileURL.path)
         check("the password goes to the Keychain when asked", log.saved == ["nas/me"], "\(log.saved)")
-        check("the server is added to the recent list", model.recentServers.items.first == "smb://nas/photos")
-        model.openConnectSheet()
-        model.connect(address: "smb://nas/photos", user: "me", password: "", remember: false)
-        await Wait.until { !model.isConnecting && !model.showConnectSheet }
+        check("the server is added to the recent list", model.connections.recentServers.items.first == "smb://nas/photos")
+        model.connections.openConnectSheet()
+        model.connections.connect(address: "smb://nas/photos", user: "me", password: "", remember: false)
+        await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
         await settle()
         check("an empty password falls back to the one in the Keychain", log.mounts.last == "nas|me|stored-pass", log.mounts.last ?? "nil")
         check("the password is not saved again when not asked", log.saved.count == 1)
-        model.mounter = { _, _, _ in .failure(MountFailure(code: 80)) }
-        model.openConnectSheet()
-        model.connect(address: "smb://nas/photos", user: "me", password: "wrong", remember: false)
-        await Wait.until { !model.isConnecting }
+        model.connections.mounter = { _, _, _ in .failure(MountFailure(code: 80)) }
+        model.connections.openConnectSheet()
+        model.connections.connect(address: "smb://nas/photos", user: "me", password: "wrong", remember: false)
+        await Wait.until { !model.connections.isConnecting }
         check("a refused login says why and keeps the sheet open",
-              model.connectError == "The name or password was not accepted." && model.showConnectSheet, model.connectError ?? "nil")
-        model.closeConnectSheet()
-        check("Cancel closes the sheet and clears the message", !model.showConnectSheet && model.connectError == nil)
-        model.clearRecentServers()
-        check("Clear Recents empties the list", model.recentServers.items.isEmpty)
+              model.connections.connectError == "The name or password was not accepted." && model.connections.showConnectSheet, model.connections.connectError ?? "nil")
+        model.connections.closeConnectSheet()
+        check("Cancel closes the sheet and clears the message", !model.connections.showConnectSheet && model.connections.connectError == nil)
+        model.connections.clearRecentServers()
+        check("Clear Recents empties the list", model.connections.recentServers.items.isEmpty)
         model.tab.go(to: c.docs)
         await settle()
 

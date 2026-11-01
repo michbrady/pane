@@ -112,7 +112,7 @@ struct PaneApp: App {
                 Divider()
                 Button("Go to Address…") { model.beginEditingAddress() }
                     .keyboardShortcut("l")
-                Button("Connect to Server…") { model.openConnectSheet() }
+                Button("Connect to Server…") { model.connections.openConnectSheet() }
                     .keyboardShortcut("k")
             }
         }

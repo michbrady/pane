@@ -5,7 +5,7 @@ Two targets. `PaneKit` has no SwiftUI. `Pane` is the app and depends on it.
 | Target | Holds |
 | --- | --- |
 | `PaneKit` | `FolderItem`, `FolderLister`, `NavigationHistory`, `PathResolver`, `Breadcrumbs`, `FileSystem`, `FileOperations`, `OperationRecord`, `DropRules`, `FolderSorter`, `PinStore`, `FileSearch`, `TagEditor`, `ItemProperties`, `PreviewKind`, `SelectionSummary`, `VolumeInfo`, `CloudLocations`, `SMBAddress`, `Shortcut`, `FolderHandler`. Pure, testable with `swift test`. |
-| `Pane` | `AppModel` (the tabs, the Navigation pane, the Address bar, Quick access pins), `FolderTab` (one folder: history, listing, selection, watcher), `FileActions` (clipboard, operations, sheets, undo, for the active tab), `ViewSettings` (sort, view mode, hidden files, columns), views, `Locations` and `Prefs`, `FolderWatcher`, `NavNode`, snapshot and self-test modes. |
+| `Pane` | `AppModel` (the tabs, the Address bar, and the small system hooks), `Places` (the Navigation pane's rows: Quick access pins, This Mac, drives, Network, Cloud, eject, and the tree selection), `Connections` (Connect to Server: the sheet state, the recent list, the mount), `FolderTab` (one folder: history, listing, selection, watcher), `FileActions` (clipboard, operations, sheets, undo, for the active tab), `ViewSettings` (sort, view mode, hidden files, columns), views, `Locations` and `Prefs`, `FolderWatcher`, `NavNode`, snapshot and self-test modes. |
 
 Data flow: `AppModel.go(to:)` updates `NavigationHistory`, reloads the
 listing on a background task through `FolderLister`, and watches the folder
@@ -27,4 +27,4 @@ Views: `FolderContent` picks Details, List, or Icons. `PreviewPane`, `Properties
 
 The wrappers around the Mac are `SystemSpotlight`, `SMBMount` and `PasswordKeychain`, `GlobalHotKey`, `SystemFolderHandler`, and `QuickLookController`. Each has a plain `PaneKit` type for its rules and a fake for tests, so the self-test never changes your Mac, network, or Keychain.
 
-Reviews: `docs/architecture-review-2026-10-31-m5.md` recommends moving the Navigation pane's places and connecting into their own types before M6. `docs/architecture-review-2026-10-31-m4.md` recommends a faster, steadier self-test. `docs/architecture-review-2026-10-31-m2.md` split `AppModel` into `FolderTab` and `FileActions` before tabs. `docs/architecture-review-2026-10-31-m3.md` found nothing to change after M3.
+Reviews: `docs/architecture-review-2026-10-31-m5.md` moved the Navigation pane's places into `Places` and connecting into `Connections` before M6 (done: `AppModel` went from 468 to 307 lines). `docs/architecture-review-2026-10-31-m4.md` recommends a faster, steadier self-test. `docs/architecture-review-2026-10-31-m2.md` split `AppModel` into `FolderTab` and `FileActions` before tabs. `docs/architecture-review-2026-10-31-m3.md` found nothing to change after M3.

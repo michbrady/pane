@@ -26,7 +26,7 @@ enum Snapshot {
             model.tab.endSearch(reload: false)
             model.closeProperties()
             model.dismissFullDiskAccessGuide()
-            model.closeConnectSheet()
+            model.connections.closeConnectSheet()
             if self != .network { model.places.volumeSource = { [] }; model.places.refreshVolumes() }
             model.closeOtherTabs(except: model.tab)
             switch self {
@@ -122,9 +122,9 @@ enum Snapshot {
                 }
             case .connect:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
-                model.clearRecentServers()
-                model.recentServersForSnapshot(["smb://nas/photos", "smb://backup.local/files"])
-                model.openConnectSheet()
+                model.connections.clearRecentServers()
+                model.connections.recentServersForSnapshot(["smb://nas/photos", "smb://backup.local/files"])
+                model.connections.openConnectSheet()
             case .cloud:
                 model.places.refreshVolumes()
                 if let icloud = model.places.cloudRoots.first { model.tab.go(to: icloud.url) }
