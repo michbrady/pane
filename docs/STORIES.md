@@ -305,8 +305,8 @@ Acceptance:
 - [self] Rubber band selection works in Details and Icons.
 - [unit] Shift-click selects a range in sort order.
 - [self] Selection count shows in the status bar.
-Note: Built, not yet seen working. Dragging on empty space draws a box and selects what it touches, with Command or Shift adding to the selection. Icons: a SwiftUI drag on the grid's background, so a drag that starts on an icon still drags the file. Details and List: a mouse monitor that starts a box only when the click lands below the last row of the list's table, selecting rows on the AppKit table. The rule (`RubberBand`) is unit-tested. Not verified: a real drag in either view, because the self-test cannot press the mouse. The Details version also depends on the SwiftUI Table following selection set on its AppKit table.
-Status: doing
+Note: Verified with a real mouse drag (`tools/box-test.sh`, and `tools/box-test.sh icons`): in Details a box from the empty space below the rows up across the last four rows selected exactly those four; in Icons a box selected the three icons it crossed; the Status bar read "4 items selected" and "3 items selected". Dragging on empty space draws a box and selects what it touches, with Command or Shift adding to the selection. Icons: a SwiftUI drag on the grid's background, so a drag that starts on an icon still drags the file. Details and List: a mouse monitor that starts a box only when the click lands below the last row of the list's table, selecting rows on the AppKit table. The rule (`RubberBand`) is unit-tested. Still [manual]: Command or Shift added to a selection, and a long folder that scrolls while the box is dragged (Details auto-scrolls, Icons does not).
+Status: done
 
 ## M4 Find and inspect
 
