@@ -649,6 +649,81 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(decoded == state)
 }
 
+@Test func remoteURLsAreRecognizedAndMadeTidy() {
+    #expect(RemoteURL.isRemote(URL(string: "sftp://nas/files")!))
+    #expect(RemoteURL.isRemote(URL(string: "S3://bucket/key")!))
+    #expect(!RemoteURL.isRemote(URL(fileURLWithPath: "/Users/me")))
+    #expect(!RemoteURL.isRemote(URL(string: "https://example.com")!))
+    #expect(RemoteURL.make(scheme: "SFTP", host: "nas.local", port: 2222, user: "me", path: "Documents/2026").absoluteString == "sftp://me@nas.local:2222/Documents/2026")
+    #expect(RemoteURL.make(scheme: "ftp", host: "host").absoluteString == "ftp://host/")
+    #expect(RemoteURL.canonical(URL(string: "SFTP://NAS/a/./b/../c/")!).absoluteString == "sftp://nas/a/c")
+    #expect(RemoteURL.canonical(URL(string: "sftp://nas")!).absoluteString == "sftp://nas/")
+}
+
+@Test func aRemoteFolderWalksUpToTheTopOfTheServer() {
+    let url = URL(string: "sftp://nas/Documents/Work/2026")!
+    #expect(RemoteURL.chain(for: url).map(\.absoluteString) == ["sftp://nas/", "sftp://nas/Documents", "sftp://nas/Documents/Work", "sftp://nas/Documents/Work/2026"])
+    #expect(RemoteURL.parent(of: url)?.absoluteString == "sftp://nas/Documents/Work")
+    #expect(RemoteURL.parent(of: URL(string: "sftp://nas/")!) == nil)
+    #expect(RemoteURL.name(of: url) == "2026" && RemoteURL.name(of: URL(string: "sftp://nas/")!) == "nas")
+    #expect(Breadcrumbs.chain(for: url).count == 4 && Breadcrumbs.parent(of: url)?.absoluteString == "sftp://nas/Documents/Work")
+}
+
+@Test func aServerIsIdentifiedBySchemeHostAndPort() {
+    #expect(RemoteURL.serverKey(URL(string: "SFTP://Nas/a/b")!) == "sftp://nas")
+    #expect(RemoteURL.serverKey(URL(string: "ftp://nas:2121/a")!) == "ftp://nas:2121")
+    #expect(RemoteURL.serverKey(URL(string: "sftp://nas/a")!) != RemoteURL.serverKey(URL(string: "ftp://nas/a")!))
+}
+
+@Test func aTypedRemoteAddressBecomesAURL() {
+    #expect(RemoteURL.parse("sftp://nas/Documents")?.absoluteString == "sftp://nas/Documents")
+    #expect(RemoteURL.parse("  ftp://nas  ")?.absoluteString == "ftp://nas/")
+    #expect(RemoteURL.parse("sftp://nas/My Photos")?.absoluteString == "sftp://nas/My%20Photos")
+    #expect(RemoteURL.parse("~/Documents") == nil)
+    #expect(RemoteURL.parse("http://example.com") == nil)
+    #expect(RemoteURL.parse("sftp://") == nil)
+}
+
+@Test func theRouterPicksThisMacOrTheOpenConnection() {
+    let router = FileSystemRouter()
+    let nas = InMemoryRemote(serverKey: "sftp://nas")
+    #expect(router.filesystem(for: URL(fileURLWithPath: "/Users")) is LocalFileSystem)
+    #expect(router.filesystem(for: URL(string: "sftp://nas/a")!) == nil)
+    router.register(nas)
+    #expect((router.filesystem(for: URL(string: "sftp://nas/a/b")!) as? InMemoryRemote) === nas)
+    #expect(router.filesystem(for: URL(string: "sftp://other/a")!) == nil)
+    #expect(router.serverKeys == ["sftp://nas"])
+    router.remove(serverKey: "sftp://nas")
+    #expect(router.serverKeys.isEmpty)
+}
+
+@Test func aServerListsFoldersFirstInNaturalOrderLikeALocalFolder() async throws {
+    let nas = InMemoryRemote(serverKey: "sftp://nas")
+    nas.add(folder: "/Docs"); nas.add(folder: "/archive")
+    nas.add(file: "/file10.txt"); nas.add(file: "/file2.txt")
+    let listed = try await nas.list(URL(string: "sftp://nas/")!)
+    #expect(listed.map(\.name) == ["archive", "Docs", "file2.txt", "file10.txt"])
+    #expect(listed.first?.url.absoluteString == "sftp://nas/archive")
+    #expect(listed.first?.isFolder == true && listed.last?.isFolder == false)
+}
+
+@Test func aDroppedConnectionFailsListingsUntilItReconnects() async throws {
+    let nas = InMemoryRemote(serverKey: "sftp://nas")
+    nas.add(file: "/a.txt")
+    nas.dropConnection()
+    await #expect(throws: RemoteError.connectionLost) { try await nas.list(URL(string: "sftp://nas/")!) }
+    try await nas.reconnect()
+    #expect(try await nas.list(URL(string: "sftp://nas/")!).count == 1)
+}
+
+@Test func aFileOnAServerGetsItsKindFromItsName() {
+    #expect(FolderItem.kind(forFileNamed: "Trip.pdf", isFolder: false) == "PDF document")
+    #expect(FolderItem.kind(forFileNamed: "photo.JPG", isFolder: false) == "JPEG image")
+    #expect(FolderItem.kind(forFileNamed: "Documents", isFolder: true) == "File folder")
+    #expect(FolderItem.kind(forFileNamed: "README", isFolder: false) == "File")
+    #expect(FolderItem.kind(forFileNamed: "data.zzqx", isFolder: false) == "ZZQX file")
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

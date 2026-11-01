@@ -1,5 +1,7 @@
 import AppKit
+import UniformTypeIdentifiers
 import Foundation
+import PaneKit
 
 /// Where Pane starts and which places the Navigation pane lists.
 ///   APP_HOME=<dir> Pane     treat <dir> as the home folder, and use throwaway settings
@@ -29,6 +31,7 @@ enum Locations {
     static var cloudNames: [String: String] = [:]
 
     static func displayName(for url: URL) -> String {
+        if RemoteURL.isRemote(url) { return RemoteURL.name(of: url) }
         if let name = cloudNames[url.standardizedFileURL.path] { return name }
         if url.path == "/" { return FileManager.default.displayName(atPath: "/") }
         if url.path == home.path, !isOverridden { return NSUserName() }
@@ -57,6 +60,15 @@ enum IconCache {
             key = url.path
         } else {
             key = "." + url.pathExtension.lowercased()
+        }
+        if RemoteURL.isRemote(url) {
+            // A file on a server has no path on this Mac, so its icon comes from its type.
+            let typeKey = isFolder ? "remote-folder" : "remote." + url.pathExtension.lowercased()
+            if let cached = byKey[typeKey] { return cached }
+            let type = isFolder ? UTType.folder : (UTType(filenameExtension: url.pathExtension) ?? .data)
+            let image = NSWorkspace.shared.icon(for: type)
+            byKey[typeKey] = image
+            return image
         }
         if let cached = byKey[key] { return cached }
         let image = isFolder

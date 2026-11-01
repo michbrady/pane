@@ -13,7 +13,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, remote, remoteLost = "remote-lost", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -26,6 +26,7 @@ enum Snapshot {
             model.tab.endSearch(reload: false)
             model.closeProperties()
             model.dismissFullDiskAccessGuide()
+            for key in model.router.serverKeys { model.disconnect(serverKey: key) }
             model.connections.closeConnectSheet()
             if self != .network { model.places.volumeSource = { [] }; model.places.refreshVolumes() }
             model.closeOtherTabs(except: model.tab)
@@ -125,6 +126,20 @@ enum Snapshot {
                 model.connections.clearRecentServers()
                 model.connections.recentServersForSnapshot(["smb://nas/photos", "smb://backup.local/files"])
                 model.connections.openConnectSheet()
+            case .remote, .remoteLost:
+                let nas = InMemoryRemote(serverKey: "sftp://nas")
+                for folder in ["/Photos", "/Documents", "/Documents/Taxes", "/Backups"] { nas.add(folder: folder) }
+                nas.add(file: "/Documents/Budget 2026.xlsx", size: 118_000); nas.add(file: "/Documents/Notes.txt", size: 2_400)
+                nas.add(file: "/Documents/Trip itinerary.pdf", size: 1_884_160)
+                model.connected(nas)
+                model.tab.go(to: RemoteURL.make(scheme: "sftp", host: "nas", path: "/Documents"))
+                if self == .remoteLost {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(250))
+                        nas.dropConnection()
+                        model.tab.reload()
+                    }
+                }
             case .cloud:
                 model.places.refreshVolumes()
                 if let icloud = model.places.cloudRoots.first { model.tab.go(to: icloud.url) }

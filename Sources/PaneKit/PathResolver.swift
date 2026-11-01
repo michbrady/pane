@@ -42,6 +42,7 @@ public enum PathResolver {
 /// The folders from the root down to a folder, for the Address bar.
 public enum Breadcrumbs {
     public static func chain(for url: URL) -> [URL] {
+        if RemoteURL.isRemote(url) { return RemoteURL.chain(for: url) }
         var result: [URL] = []
         var current = url.standardizedFileURL
         while true {
@@ -55,6 +56,7 @@ public enum Breadcrumbs {
 
     /// The folder above, or nil at the root.
     public static func parent(of url: URL) -> URL? {
+        if RemoteURL.isRemote(url) { return RemoteURL.parent(of: url) }
         let parent = url.deletingLastPathComponent().standardizedFileURL
         return parent.path == url.standardizedFileURL.path ? nil : parent
     }

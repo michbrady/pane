@@ -1,3 +1,4 @@
+import PaneKit
 import SwiftUI
 
 /// The tree on the left: Quick access, then This Mac.
@@ -22,6 +23,11 @@ struct NavigationPane: View {
                     ForEach(model.places.cloudRoots) { NavRow(node: $0) }
                 }
             }
+            if !model.places.connectionRoots.isEmpty {
+                Section("Connections") {
+                    ForEach(model.places.connectionRoots) { NavRow(node: $0) }
+                }
+            }
             if !model.places.networkRoots.isEmpty {
                 Section("Network") {
                     ForEach(model.places.networkRoots) { NavRow(node: $0) }
@@ -30,6 +36,10 @@ struct NavigationPane: View {
         }
         .onChange(of: model.places.navSelection) { _, id in
             guard let id, let url = Places.url(forNavID: id), url != model.tab.currentFolder else { return }
+            // A server's row stands for the whole server. Being in one of its folders already means
+            // that row is selected, so it must not pull the tab back to the server's top.
+            let current = model.tab.currentFolder
+            if RemoteURL.isRemote(url), RemoteURL.isRemote(current), RemoteURL.serverKey(url) == RemoteURL.serverKey(current) { return }
             model.tab.go(to: url)
         }
     }

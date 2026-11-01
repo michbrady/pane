@@ -475,7 +475,8 @@ Acceptance:
 - [snap] The Address bar shows a remote path as `sftp://host/path` in the breadcrumbs, and the tree lists the connection under "Connections".
 - [self] Listing runs in the background and shows "Loading…" after half a second, with Cancel.
 - [self] A lost connection shows "Connection lost." with a "Reconnect" button and keeps the last listing dimmed.
-Status: todo
+Note: the layer is built and tested against an in-memory server: the same listing order as a local folder, server addresses in the Address bar, the server's row under Connections, Loading… with Cancel, and Connection lost with Reconnect and the last list dimmed. FTP, SFTP, and S3 plug into it in S-061 to S-063. Until S-064 and S-065, anything that would change files in or out of a server (paste, drop, Trash, rename, new folder, delete) is blocked with a message, so a server address never reaches a local file call. The breadcrumbs show names ("nas > Documents"), and the full address shows when you click the bar.
+Status: done
 
 ### S-061 Connect to an FTP server
 As the user, I add an FTP server with host, port, name and password and browse it.

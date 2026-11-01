@@ -45,8 +45,25 @@ struct FolderContent: View {
             }
             return .handled
         }
+        // After a lost connection the last list stays, dimmed, under the banner.
+        .opacity(model.tab.isStale ? 0.45 : 1)
+        .overlay(alignment: .top) { staleBanner }
         .overlay { stateOverlay }
         .animation(nil, value: model.tab.items)
+    }
+
+    /// "Connection lost." with Reconnect, over the dimmed last list.
+    @ViewBuilder
+    private var staleBanner: some View {
+        if model.tab.loadProblem == .connectionLost {
+            HStack(spacing: Space.md) {
+                Label("Connection lost.", systemImage: "wifi.exclamationmark")
+                Button("Reconnect") { model.tab.reconnect() }
+            }
+            .padding(Space.md)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+            .padding(Space.md)
+        }
     }
 
     @ViewBuilder
@@ -59,6 +76,11 @@ struct FolderContent: View {
             } actions: {
                 Button("Go to Home Folder") { model.tab.go(to: Locations.home) }
             }
+        } else if model.tab.loadProblem == .connectionLost {
+            // The banner says it, over the dimmed list. Nothing else covers the list.
+            EmptyView()
+        } else if let error = model.tab.loadError, model.tab.isRemote {
+            ContentUnavailableView(error, systemImage: "exclamationmark.triangle")
         } else if let error = model.tab.loadError {
             ContentUnavailableView {
                 Label(error, systemImage: "lock.fill")
@@ -73,8 +95,20 @@ struct FolderContent: View {
             } else {
                 ContentUnavailableView.search(text: model.tab.searchText)
             }
+        } else if model.tab.loadProblem == .notConnected {
+            ContentUnavailableView {
+                Label("Not connected to this server", systemImage: "network.slash")
+            } description: {
+                Text("Connect to it again to browse this folder.")
+            } actions: {
+                Button("Go to Home Folder") { model.tab.go(to: Locations.home) }
+            }
         } else if model.tab.isSlow {
-            ProgressView("Loading…")
+            VStack(spacing: Space.md) {
+                ProgressView("Loading…")
+                // A slow folder, like one on a far server, can be given up on.
+                Button("Cancel") { model.tab.cancelLoad() }
+            }
         } else if model.tab.items.isEmpty, !model.tab.isLoading {
             ContentUnavailableView("This folder is empty", systemImage: "folder")
         }

@@ -55,3 +55,21 @@ Cause: a run started while an earlier Pane was still shutting down, and both use
 Fix: `tools/selftest.sh` waits for any running Pane to exit before it starts.
 Rule: run the self-test one at a time. Never start a second run while one may still be going.
 
+
+## Going into a server's folder snapped back to the server's top (S-060)
+Symptom: found by the self-test. Opening a folder on a server, or typing `sftp://nas/Docs` from a local folder, ended up at `sftp://nas/`.
+Cause: the tree selects the server's row, and a selection change navigates to the row's folder. The server's row means its top.
+Fix: the tree does not navigate when the selected row is the server the tab is already inside.
+Rule: a tree row that stands for a whole place must not act as a "go to" when the tab is already somewhere inside it.
+
+## The lost-connection screen also told people to allow Full Disk Access (S-060)
+Symptom: found in a snapshot. Under the correct "Connection lost. Reconnect" banner, a second overlay said "Pane needs Full Disk Access".
+Cause: the generic error overlay showed for any load error, and its text is about permissions on this Mac.
+Fix: a lost connection shows only the banner over the dimmed list, and errors from a server show their own words.
+Rule: every error state has its own words. A generic overlay must name what it is for.
+
+## A server's row could list this Mac's folders (S-060)
+Symptom: found in a snapshot: the server row had an expand arrow.
+Cause: listing the server's URL as a local path read this Mac's root folder.
+Fix: rows for servers never list folders in the tree.
+Rule: a remote URL must never reach a local file call. Check both the call and what it would show.

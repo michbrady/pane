@@ -13,8 +13,15 @@ final class FolderTab: Identifiable {
     var selection: Set<URL> = []
     private(set) var loadError: String?
     /// Why the folder cannot be shown: Pane may not read it, or it is gone (a drive or share was disconnected).
-    enum LoadProblem { case unreadable, unavailable }
+    enum LoadProblem { case unreadable, unavailable, connectionLost, notConnected }
     private(set) var loadProblem: LoadProblem?
+    /// True when a connection dropped and the list is the last one we had. It shows dimmed, with Reconnect.
+    private(set) var isStale = false
+    /// The open connections to servers. A remote folder is listed through one.
+    var router = FileSystemRouter()
+    /// Asked to open a file on a server. The app says what is not built yet.
+    var requestRemoteOpen: ((URL) -> Void)?
+    var isRemote: Bool { RemoteURL.isRemote(currentFolder) }
     private(set) var isLoading = false
     /// True once a load has taken more than half a second.
     private(set) var isSlow = false
@@ -70,7 +77,8 @@ final class FolderTab: Identifiable {
 
     /// One spelling per folder, so the same folder reached two ways is equal.
     static func canonical(_ url: URL) -> URL {
-        URL(fileURLWithPath: url.standardizedFileURL.path)
+        if RemoteURL.isRemote(url) { return RemoteURL.canonical(url) }
+        return URL(fileURLWithPath: url.standardizedFileURL.path)
     }
 
     func go(to url: URL) {
@@ -104,6 +112,7 @@ final class FolderTab: Identifiable {
             return
         }
         for item in chosen where !item.isFolder {
+            if RemoteURL.isRemote(item.url) { requestRemoteOpen?(item.url); continue }
             if item.isOnlineOnly, let requestDownload { requestDownload(item.url) } else { openFile(item.url) }
         }
     }
@@ -145,7 +154,8 @@ final class FolderTab: Identifiable {
         endSearch(reload: false)
         selection = []
         didNavigate?()
-        watcher.watch(currentFolder) { [weak self] in self?.scheduleReload() }
+        // A server does not report changes, so there is nothing to watch or poll. F5 looks again.
+        if isRemote { watcher.stop() } else { watcher.watch(currentFolder) { [weak self] in self?.scheduleReload() } }
         startPolling()
         reload()
     }
@@ -205,8 +215,14 @@ final class FolderTab: Identifiable {
             try? await Task.sleep(for: .seconds(0.5))
             if mine == generation, isLoading { isSlow = true }
         }
+        let router = self.router
         Task {
-            let result = await Task.detached { Result { try FolderLister.list(folder, showHidden: hidden) } }.value
+            let result: Result<[FolderItem], Error>
+            if RemoteURL.isRemote(folder) {
+                result = await Self.listRemote(folder, hidden: hidden, router: router)
+            } else {
+                result = await Task.detached { Result { try FolderLister.list(folder, showHidden: hidden) } }.value
+            }
             guard mine == generation else { return }
             isLoading = false
             isSlow = false
@@ -217,6 +233,7 @@ final class FolderTab: Identifiable {
                 items = sorted(listed)
                 loadError = nil
                 loadProblem = nil
+                isStale = false
                 let still = Set(listed.map(\.url))
                 selection = selection.intersection(still)
                 // After Trash or delete, select the item that moved up. Wait for a listing
@@ -239,19 +256,66 @@ final class FolderTab: Identifiable {
                         if currentFolder == folder { action() }
                     }
                 }
-            case .failure:
-                items = []
-                // A folder that no longer exists, like one on a disconnected share, is not a permission problem.
-                loadProblem = FileManager.default.fileExists(atPath: folder.path) ? .unreadable : .unavailable
-                loadError = loadProblem == .unavailable ? "This folder is no longer available." : "Unable to read this folder."
+            case .failure(let error):
+                if let remote = error as? RemoteError, RemoteURL.isRemote(folder) {
+                    switch remote {
+                    case .connectionLost:
+                        // Keep the last list, dimmed, so the person still sees where they were.
+                        loadProblem = .connectionLost
+                        loadError = "Connection lost."
+                        isStale = true
+                    case .notConnected:
+                        items = []
+                        loadProblem = .notConnected
+                        loadError = "Not connected to this server."
+                    case .denied(let reason), .other(let reason):
+                        items = []
+                        loadProblem = .unreadable
+                        loadError = reason
+                    }
+                } else {
+                    items = []
+                    // A folder that no longer exists, like one on a disconnected share, is not a permission problem.
+                    loadProblem = FileManager.default.fileExists(atPath: folder.path) ? .unreadable : .unavailable
+                    loadError = loadProblem == .unavailable ? "This folder is no longer available." : "Unable to read this folder."
+                }
             }
+        }
+    }
+
+    /// Lists a folder on a server, hiding dot-names unless asked, in the same order as a local folder.
+    private static func listRemote(_ folder: URL, hidden: Bool, router: FileSystemRouter) async -> Result<[FolderItem], Error> {
+        guard let remote = router.remote(for: folder) else { return .failure(RemoteError.notConnected) }
+        do {
+            let listed = try await remote.list(folder).filter { hidden || !$0.name.hasPrefix(".") }
+            return .success(FolderLister.sorted(listed))
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Stop waiting for a slow folder and go back to where we were (or home).
+    func cancelLoad() {
+        generation += 1
+        isLoading = false
+        isSlow = false
+        if canGoBack { goBack() } else { go(to: Locations.home) }
+    }
+
+    /// Opens the connection again after it dropped, then lists the folder.
+    func reconnect() {
+        let folder = currentFolder
+        let router = self.router
+        Task {
+            try? await router.remote(for: folder)?.reconnect()
+            reload()
         }
     }
 
     /// A share does not report changes reliably, so look at it again every few seconds.
     private func startPolling() {
         pollTask?.cancel()
-        pollInterval = PollPolicy.interval(isLocal: !isNetworkFolder(currentFolder))
+        pollInterval = isRemote ? nil : PollPolicy.interval(isLocal: !isNetworkFolder(currentFolder))
         guard let interval = pollInterval else { pollTask = nil; return }
         pollTask = Task {
             while !Task.isCancelled {

@@ -18,7 +18,7 @@ final class NavNode: Identifiable {
         self.ejectable = ejectable
         self.url = url.standardizedFileURL
         self.prefix = prefix
-        self.id = prefix + self.url.path
+        self.id = prefix + (RemoteURL.isRemote(url) ? self.url.absoluteString : self.url.path)
         self.name = name ?? Locations.displayName(for: url)
     }
 
@@ -26,6 +26,8 @@ final class NavNode: Identifiable {
     var children: [NavNode]? {
         if !loaded {
             loaded = true
+            // A server's row has no folders to list here. Listing its URL as a local path would show this Mac's folders.
+            if RemoteURL.isRemote(url) { return nil }
             let items = (try? FolderLister.list(url)) ?? []
             let folders = items.filter(\.isFolder).map { NavNode(url: $0.url, prefix: prefix) }
             cached = folders.isEmpty ? nil : folders

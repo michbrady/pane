@@ -56,6 +56,14 @@ final class FileActions {
 
     // MARK: Copy, cut, paste
 
+    /// Changing files on a server (paste, Trash, rename, new folder, delete, drop) is not built yet.
+    /// Say so, and never let a server address reach a local file call. Returns true when blocked.
+    private func blockedOnServer() -> Bool {
+        guard tab.isRemote else { return false }
+        alertMessage = "Changing files on a server comes in a later step. For now, you can browse it."
+        return true
+    }
+
     private var editingText: NSText? { NSApp.keyWindow?.firstResponder as? NSText }
 
     /// True when the pasteboard holds files to paste.
@@ -80,6 +88,7 @@ final class FileActions {
     }
 
     func paste() {
+        if blockedOnServer() { return }
         if let text = editingText { text.paste(nil); return }
         let sources = clipboard.urls
         guard !sources.isEmpty, operationTask == nil else { return }
@@ -87,6 +96,11 @@ final class FileActions {
     }
 
     private func startPaste(_ sources: [URL], into folder: URL, mode: PasteMode, clearsCut: Bool) {
+        // A server address must never reach the local file calls, in either direction.
+        if sources.contains(where: RemoteURL.isRemote) || RemoteURL.isRemote(folder) {
+            alertMessage = "Copying to and from a server comes in a later step. For now, you can browse it."
+            return
+        }
         guard !sources.isEmpty, operationTask == nil else { return }
         run(title: mode == .copy ? "Copying" : "Moving") { [self] in
             await operations.paste(sources, into: folder, mode: mode,
@@ -193,6 +207,7 @@ final class FileActions {
     // MARK: Trash and delete
 
     func trashSelection() {
+        if blockedOnServer() { return }
         let urls = Array(tab.selection)
         guard !urls.isEmpty, operationTask == nil, editingText == nil else { return }
         tab.pendingSelection = tab.items.firstIndex { tab.selection.contains($0.url) }.map { ($0, Set(urls)) }
@@ -201,11 +216,13 @@ final class FileActions {
 
     /// Shift-Delete asks first, because this cannot be undone.
     func askDeleteImmediately() {
+        if blockedOnServer() { return }
         guard !tab.selection.isEmpty, editingText == nil else { return }
         pendingDelete = Array(tab.selection)
     }
 
     func deleteImmediately() {
+        if blockedOnServer() { pendingDelete = nil; return }
         guard let urls = pendingDelete, operationTask == nil else { return }
         pendingDelete = nil
         tab.pendingSelection = tab.items.firstIndex { urls.contains($0.url) }.map { ($0, Set(urls)) }
@@ -232,6 +249,7 @@ final class FileActions {
     var canRename: Bool { tab.selection.count == 1 && editingText == nil }
 
     func beginRename() {
+        if blockedOnServer() { return }
         guard canRename, let item = tab.selectedItems.first else { return }
         renameText = item.name
         renameError = nil
@@ -274,6 +292,7 @@ final class FileActions {
 
     /// Cmd-Shift-N: make "New folder" and start naming it.
     func newFolder() {
+        if blockedOnServer() { return }
         guard editingText == nil, operationTask == nil else { return }
         let folder = tab.currentFolder
         backgroundWork += 1

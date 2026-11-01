@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// One row in a folder listing: a file or a folder.
 public struct FolderItem: Identifiable, Hashable, Sendable {
@@ -30,5 +31,15 @@ public struct FolderItem: Identifiable, Hashable, Sendable {
         self.created = created
         self.tags = tags
         self.isOnlineOnly = isOnlineOnly
+    }
+}
+
+public extension FolderItem {
+    /// The kind for a file that is not on this Mac, such as one on a server: the system's name for its
+    /// type, like "PDF document", worked out from the name alone.
+    static func kind(forFileNamed name: String, isFolder: Bool) -> String {
+        if isFolder { return "File folder" }
+        let ext = (name as NSString).pathExtension
+        return UTType(filenameExtension: ext)?.localizedDescription ?? (ext.isEmpty ? "File" : ext.uppercased() + " file")
     }
 }

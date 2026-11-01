@@ -44,14 +44,17 @@ final class AppModel {
     private(set) var propertiesURLs: [URL]?
 
     let places = Places()
+    /// The open connections to servers, shared by every tab.
+    let router = FileSystemRouter()
 
     // Address bar
     var isEditingAddress = false
     var addressText = ""
     /// The text that did not resolve. The error shows while the field still holds it.
     private(set) var addressFailedText: String?
+    private var addressMessage = "No folder at this path."
     var addressError: String? {
-        addressFailedText != nil && addressFailedText == addressText ? "No folder at this path." : nil
+        addressFailedText != nil && addressFailedText == addressText ? addressMessage : nil
     }
 
     /// Settings reopens on the last tab. Test and snapshot runs leave it alone.
@@ -88,6 +91,8 @@ final class AppModel {
             for tab in tabs where !FileManager.default.fileExists(atPath: tab.currentFolder.path) { tab.reload() }
         }
         places.alert = { [unowned self] message in actions.alertMessage = message }
+        places.serverKeys = { [unowned self] in router.serverKeys }
+        places.disconnect = { [unowned self] key in disconnect(serverKey: key) }
         connections.didMount = { [unowned self] mountpoint in
             places.refreshVolumes()
             tab.go(to: mountpoint)
@@ -107,6 +112,8 @@ final class AppModel {
     private func makeTab(start: URL) -> FolderTab {
         let tab = FolderTab(start: start, view: view)
         tab.spotlight = Locations.isOverridden ? nil : SystemSpotlight()
+        tab.router = router
+        tab.requestRemoteOpen = { [unowned self] _ in actions.alertMessage = "Opening a file on a server comes in a later step. For now, browse it." }
         tab.requestDownload = { [unowned self] url in actions.downloadAndOpen(url) }
         tab.didNavigate = { [unowned self, unowned tab] in
             // A tab in the background changes nothing outside itself.
@@ -161,14 +168,33 @@ final class AppModel {
 
     private func saveTabs() {
         let defaults = Prefs.defaults
-        defaults.set(tabs.map { $0.currentFolder.path }, forKey: "pane.tabs")
+        // A server is not reconnected at launch, so a tab on one is saved as the home folder.
+        let saved = { (tab: FolderTab) in tab.isRemote ? Locations.home.path : tab.currentFolder.path }
+        defaults.set(tabs.map(saved), forKey: "pane.tabs")
         defaults.set(activeIndex, forKey: "pane.activeTab")
-        defaults.set(tab.currentFolder.path, forKey: "pane.folder")
+        defaults.set(saved(tab), forKey: "pane.folder")
     }
 
     /// Cut and Copy work on a selection, or on the text in the Address bar.
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
+
+    // MARK: Servers
+
+    /// A server is connected: file it in the router and show it under Connections.
+    func connected(_ server: any RemoteFileSystem) {
+        router.register(server)
+        places.refreshConnections()
+    }
+
+    /// Eject on a server's row: close the connection and take it off the list.
+    func disconnect(serverKey: String) {
+        let server = router.remote(for: URL(string: serverKey + "/")!)
+        router.remove(serverKey: serverKey)
+        for tab in tabs where tab.isRemote && RemoteURL.serverKey(tab.currentFolder) == serverKey { tab.go(to: Locations.home) }
+        places.refreshConnections()
+        Task { await server?.disconnect() }
+    }
 
     // MARK: Global shortcut
 
@@ -283,7 +309,11 @@ final class AppModel {
     func beginEditingAddress() {
         let home = Locations.home.path
         let path = tab.currentFolder.path
-        addressText = path == home ? "~" : (path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path)
+        if tab.isRemote {
+            addressText = tab.currentFolder.absoluteString.removingPercentEncoding ?? tab.currentFolder.absoluteString
+        } else {
+            addressText = path == home ? "~" : (path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path)
+        }
         addressFailedText = nil
         isEditingAddress = true
     }
@@ -294,6 +324,19 @@ final class AppModel {
     }
 
     func commitAddress() {
+        // A server address, like sftp://nas/Documents. It needs an open connection.
+        if let remote = RemoteURL.parse(addressText) {
+            guard router.remote(for: remote) != nil else {
+                addressMessage = "Not connected to that server. Use Go > Connect to Server."
+                addressFailedText = addressText
+                return
+            }
+            isEditingAddress = false
+            addressFailedText = nil
+            tab.go(to: remote)
+            return
+        }
+        addressMessage = "No folder at this path."
         switch PathResolver.resolve(addressText, home: Locations.home, base: tab.currentFolder) {
         case .success(let url):
             isEditingAddress = false
