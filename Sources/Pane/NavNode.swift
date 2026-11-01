@@ -9,13 +9,23 @@ final class NavNode: Identifiable {
     let name: String
     /// True for an external drive or a share: the row shows an eject button.
     let ejectable: Bool
+    /// A saved server that is not connected now: the row is dimmed, and a click connects.
+    let isOffline: Bool
+    /// The SF Symbol to show instead of a folder icon, for a connection's protocol.
+    let symbol: String?
+    /// Set for a saved connection, so its row can be edited or removed.
+    let savedID: UUID?
     private let prefix: String
     private var loaded = false
     private var cached: [NavNode]?
 
     /// `prefix` keeps ids apart when one folder shows in two places ("quick:", "home:", "vol:").
-    init(url: URL, prefix: String, name: String? = nil, ejectable: Bool = false) {
+    init(url: URL, prefix: String, name: String? = nil, ejectable: Bool = false,
+         isOffline: Bool = false, symbol: String? = nil, savedID: UUID? = nil) {
         self.ejectable = ejectable
+        self.isOffline = isOffline
+        self.symbol = symbol
+        self.savedID = savedID
         self.url = url.standardizedFileURL
         self.prefix = prefix
         self.id = prefix + (RemoteURL.isRemote(url) ? self.url.absoluteString : self.url.path)

@@ -13,7 +13,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, transfer, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", remoteDelete = "remote-delete", remoteEdit = "remote-edit", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, transfer, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", remoteDelete = "remote-delete", remoteEdit = "remote-edit", savedConnections = "saved-connections", manageConnections = "manage-connections", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -29,6 +29,8 @@ enum Snapshot {
             model.dismissFullDiskAccessGuide()
             for key in model.router.serverKeys { model.disconnect(serverKey: key) }
             model.connections.closeConnectSheet()
+            model.connections.showManageSheet = false
+            model.connections.savedForSnapshot([])
             if self != .network { model.places.volumeSource = { [] }; model.places.refreshVolumes() }
             model.closeOtherTabs(except: model.tab)
             switch self {
@@ -132,13 +134,28 @@ enum Snapshot {
                 if self == .connectSFTPTrust {
                     model.connections.showTrustForSnapshot(host: "nas.local", fingerprint: "SHA256:7vQ2kXc0nR9aYtL3mH8dFhP1uJ4bWzE6sOiTgNxKqAw")
                 }
-            case .remote, .remoteLost, .remoteDelete, .remoteEdit:
+            case .remote, .remoteLost, .remoteDelete, .remoteEdit, .savedConnections, .manageConnections:
                 let nas = InMemoryRemote(serverKey: "sftp://nas")
                 for folder in ["/Photos", "/Documents", "/Documents/Taxes", "/Backups"] { nas.add(folder: folder) }
                 nas.add(file: "/Documents/Budget 2026.xlsx", size: 118_000); nas.add(file: "/Documents/Notes.txt", size: 2_400)
                 nas.add(file: "/Documents/Trip itinerary.pdf", size: 1_884_160)
+                if self == .savedConnections || self == .manageConnections {
+                    model.connections.savedForSnapshot([
+                        SavedConnection(kind: .sftp, host: "nas", user: "me"),
+                        SavedConnection(kind: .s3, host: "minio.local", port: 9000, user: "AKIAEXAMPLE", region: "us-east-1"),
+                        SavedConnection(kind: .ftps, host: "ftp.example.com", user: "web"),
+                    ])
+                }
                 model.connected(nas)
                 model.tab.go(to: RemoteURL.make(scheme: "sftp", host: "nas", path: "/Documents"))
+                if self == .manageConnections { model.connections.openManageSheet() }
+                if self == .savedConnections || self == .manageConnections {
+                    // A short tree, so the whole Connections section is in view.
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        model.places.expanded.removeAll()
+                    }
+                }
                 if self == .remoteEdit {
                     Task {
                         try? await Task.sleep(for: .milliseconds(300))

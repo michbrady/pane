@@ -42,6 +42,24 @@ enum PasswordKeychain {
         }
     }
 
+    static func delete(server: String, account: String, proto: CFString) {
+        SecItemDelete(query(server: server, account: account, proto: proto) as CFDictionary)
+    }
+
+    /// Removes the password or secret key saved for a connection.
+    static func delete(for connection: SavedConnection) {
+        let proto: CFString
+        switch connection.kind {
+        case .s3: proto = kSecAttrProtocolHTTPS
+        case .sftp: proto = kSecAttrProtocolSSH
+        case .ftp: proto = kSecAttrProtocolFTP
+        case .ftps: proto = kSecAttrProtocolFTPS
+        }
+        // S3 files its secret under the endpoint with its port, like the connect flow does.
+        let server = connection.kind == .s3 ? connection.host + (connection.port.map { ":\($0)" } ?? "") : connection.host
+        delete(server: server, account: connection.user, proto: proto)
+    }
+
     static func password(server: String, account: String, proto: CFString = kSecAttrProtocolSMB) -> String? {
         var request = query(server: server, account: account, proto: proto)
         request[kSecReturnData as String] = true

@@ -16,16 +16,18 @@ struct ConnectSheet: View {
     @State private var port = ""
     @State private var useKey = false
     @State private var keyPath = ""
+    @State private var saveIt = true
     @State private var endpoint = ""
 
     var body: some View {
         @Bindable var connections = model.connections
         return VStack(alignment: .leading, spacing: Space.lg) {
-            Text("Connect to Server").font(.headline)
+            Text(connections.editingID == nil ? "Connect to Server" : "Edit Connection").font(.headline)
             Picker("Type", selection: $connections.kind) {
                 ForEach(Connections.Kind.allCases) { Text($0.rawValue).tag($0) }
             }
             .onChange(of: connections.kind) { model.connections.clearConnectError() }
+            .disabled(connections.editingID != nil)
             VStack(alignment: .leading, spacing: Space.sm) {
                 switch model.connections.kind {
                 case .share:
@@ -81,6 +83,9 @@ struct ConnectSheet: View {
                 }
             }
             .textFieldStyle(.roundedBorder)
+            if connections.kind != .share {
+                Toggle("Save this connection", isOn: $saveIt)
+            }
             if let pending = model.connections.pendingTrust {
                 VStack(alignment: .leading, spacing: Space.sm) {
                     Label("Trust this server?", systemImage: "lock.shield").font(.callout.bold())
@@ -115,6 +120,9 @@ struct ConnectSheet: View {
                 }
             }
             HStack {
+                Button("Manage Connections…") { model.connections.openManageSheet() }
+                    .buttonStyle(.link)
+                    .font(.callout)
                 if model.connections.isConnecting {
                     ProgressView().controlSize(.small)
                     Text("Connecting…").foregroundStyle(.secondary)
@@ -130,14 +138,38 @@ struct ConnectSheet: View {
         .padding(Space.xl)
         .frame(width: Layout.sheetWidth)
         .noInitialFocus()
+        .onAppear { if let saved = model.connections.prefill { fill(from: saved) } }
+    }
+
+    /// Edit Connection: the saved settings, never the password. An empty password uses the Keychain's.
+    private func fill(from saved: SavedConnection) {
+        user = saved.kind == .s3 ? "" : saved.user
+        switch saved.kind {
+        case .s3:
+            accessKey = saved.user
+            region = saved.region ?? "us-east-1"
+            let isAWS = saved.host == "s3.\(region).amazonaws.com" && saved.port == nil
+            endpoint = isAWS ? "" : saved.host + (saved.port.map { ":\($0)" } ?? "")
+        case .sftp:
+            host = saved.host
+            port = saved.port.map(String.init) ?? ""
+            useKey = saved.useKey
+            keyPath = saved.keyPath ?? ""
+        case .ftp, .ftps:
+            host = saved.host
+            port = saved.port.map(String.init) ?? ""
+        }
     }
 
     private func connect() {
         switch model.connections.kind {
         case .share: model.connections.connect(address: address, user: user, password: password, remember: remember)
-        case .ftp: model.connections.connectFTP(host: host, port: port, user: user, password: password, protocol: model.connections.ftpProtocol, remember: remember)
-        case .sftp: model.connections.connectSFTP(host: host, port: port, user: user, useKey: useKey, keyPath: keyPath, secret: password, remember: remember)
-        case .s3: model.connections.connectS3(accessKey: accessKey, secretKey: password, region: region, endpoint: endpoint, remember: remember)
+        case .ftp: model.connections.connectFTP(host: host, port: port, user: user, password: password, protocol: model.connections.ftpProtocol, remember: remember,
+                                                 save: saveIt, savedID: model.connections.editingID)
+        case .sftp: model.connections.connectSFTP(host: host, port: port, user: user, useKey: useKey, keyPath: keyPath, secret: password, remember: remember,
+                                                   save: saveIt, savedID: model.connections.editingID)
+        case .s3: model.connections.connectS3(accessKey: accessKey, secretKey: password, region: region, endpoint: endpoint, remember: remember,
+                                              save: saveIt, savedID: model.connections.editingID)
         }
     }
 

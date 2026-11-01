@@ -36,6 +36,12 @@ struct NavigationPane: View {
         }
         .onChange(of: model.places.navSelection) { _, id in
             guard let id, let url = Places.url(forNavID: id), url != model.tab.currentFolder else { return }
+            // A saved server that is not connected: connect to it, and stay where we are until it is.
+            if RemoteURL.isRemote(url), model.router.remote(for: url) == nil {
+                model.openSavedConnection(serverKey: RemoteURL.serverKey(url))
+                model.places.syncTree()
+                return
+            }
             // A server's row stands for the whole server. Being in one of its folders already means
             // that row is selected, so it must not pull the tab back to the server's top.
             let current = model.tab.currentFolder
@@ -80,22 +86,33 @@ private struct NavRow: View {
         Label {
             Text(node.name)
         } icon: {
-            Image(nsImage: IconCache.icon(for: node.url, isFolder: true))
-                .resizable()
-                .frame(width: Layout.rowIcon, height: Layout.rowIcon)
-        }
-        .acceptsFileDrops(into: node.url, model: model)
-        .onMiddleClick { model.newTab(at: node.url) }
-        .contextMenu {
-            Button("Open in New Tab") { model.newTab(at: node.url) }
-            Button("Open in Terminal") { model.openInTerminal(node.url) }
-            if model.places.isPinned(node.url) {
-                Button("Unpin from Quick access") { model.places.unpin(node.url) }
+            if let symbol = node.symbol {
+                Image(systemName: symbol)
+                    .frame(width: Layout.rowIcon, height: Layout.rowIcon)
             } else {
-                Button("Pin to Quick access") { model.places.pin(node.url) }
+                Image(nsImage: IconCache.icon(for: node.url, isFolder: true))
+                    .resizable()
+                    .frame(width: Layout.rowIcon, height: Layout.rowIcon)
             }
         }
-        .help("Show folders inside \(node.name)")
+        .opacity(node.isOffline ? 0.5 : 1)
+        .acceptsFileDrops(into: node.url, model: model)
+        .onMiddleClick { if !node.isOffline { model.newTab(at: node.url) } }
+        .contextMenu {
+            if let id = node.savedID, let saved = model.connections.saved.items.first(where: { $0.id == id }) {
+                Button("Edit Connection…") { model.connections.openEdit(saved) }
+                Button("Remove Connection") { model.removeSavedConnection(id) }
+            } else if !node.id.hasPrefix("conn:") {
+                Button("Open in New Tab") { model.newTab(at: node.url) }
+                Button("Open in Terminal") { model.openInTerminal(node.url) }
+                if model.places.isPinned(node.url) {
+                    Button("Unpin from Quick access") { model.places.unpin(node.url) }
+                } else {
+                    Button("Pin to Quick access") { model.places.pin(node.url) }
+                }
+            }
+        }
+        .help(node.isOffline ? "Connect to \(node.name)" : "Show folders inside \(node.name)")
     }
 
     private var expansion: Binding<Bool> {

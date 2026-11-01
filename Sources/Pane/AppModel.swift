@@ -93,6 +93,8 @@ final class AppModel {
         }
         places.alert = { [unowned self] message in actions.alertMessage = message }
         places.serverKeys = { [unowned self] in router.serverKeys }
+        places.savedConnections = { [unowned self] in connections.saved.items }
+        connections.savedChanged = { [unowned self] in places.refreshConnections() }
         places.disconnect = { [unowned self] key in disconnect(serverKey: key) }
         connections.didConnect = { [unowned self] server, place in
             connected(server)
@@ -186,6 +188,19 @@ final class AppModel {
 
 
     // MARK: Servers
+
+    /// Remove Connection: close it if open, delete the saved entry, and delete its Keychain item.
+    func removeSavedConnection(_ id: UUID) {
+        guard let saved = connections.saved.items.first(where: { $0.id == id }) else { return }
+        if router.serverKeys.contains(saved.serverKey) { disconnect(serverKey: saved.serverKey) }
+        connections.remove(id)
+    }
+
+    /// A click on a saved server that is not connected.
+    func openSavedConnection(serverKey: String) {
+        guard let saved = connections.saved.connection(forServerKey: serverKey) else { return }
+        connections.openSaved(saved)
+    }
 
     /// A server is connected: file it in the router and show it under Connections.
     func connected(_ server: any RemoteFileSystem) {

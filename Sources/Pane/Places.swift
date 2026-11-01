@@ -17,6 +17,8 @@ final class Places {
     private(set) var cloudRoots: [NavNode] = []
     /// The servers connected now, each as a row under Connections.
     private(set) var connectionRoots: [NavNode] = []
+    /// The saved connections, in the order they were saved. AppModel sets it.
+    var savedConnections: () -> [SavedConnection] = { [] }
     var thisMacRoots: [NavNode] { [homeRoot] + driveRoots }
     /// Where the mounted volumes come from. Tests use a fake list, so they see the same on every Mac.
     var volumeSource: () -> [VolumeInfo] = { Locations.isOverridden ? [] : VolumeInfo.mounted() }
@@ -45,9 +47,20 @@ final class Places {
 
     /// Lists the connected servers again.
     func refreshConnections() {
-        connectionRoots = serverKeys().compactMap { key in
+        let connected = Set(serverKeys())
+        let saved = savedConnections()
+        // Saved servers always show, dimmed while they are not connected. Connected ones that were never saved follow.
+        var roots: [NavNode] = saved.compactMap { connection in
+            guard let url = URL(string: connection.serverKey + "/") else { return nil }
+            let isOn = connected.contains(connection.serverKey)
+            return NavNode(url: url, prefix: "conn:", name: connection.displayName, ejectable: isOn,
+                           isOffline: !isOn, symbol: connection.kind.symbol, savedID: connection.id)
+        }
+        let savedKeys = Set(saved.map(\.serverKey))
+        roots += serverKeys().filter { !savedKeys.contains($0) }.compactMap { key in
             URL(string: key + "/").map { NavNode(url: $0, prefix: "conn:", name: Self.serverName(key), ejectable: true) }
         }
+        connectionRoots = roots
         syncTree()
     }
 

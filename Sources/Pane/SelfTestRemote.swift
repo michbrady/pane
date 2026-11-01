@@ -381,6 +381,80 @@ extension SelfTest {
         check("a file that is gone says so, and opens nothing", model.actions.alertMessage != nil)
         model.actions.alertMessage = nil
 
+        // S-067 Save connections (stubs stand in for the network and the Keychain)
+        let deleted = S3Log()
+        let kept = S3Log()
+        model.connections.makeS3 = { endpoint, region, credentials in
+            S3FileSystem(endpoint: endpoint, region: region, credentials: credentials, transport: StubS3(goodKey: "GOODKEY", down: endpoint.hasPrefix("down")))
+        }
+        model.connections.saveSecret = { _, server, account in kept.saved.append("\(server)/\(account)") }
+        model.connections.savedSecret = { _, account in account == "GOODKEY" ? "stored-secret" : nil }
+        model.connections.savedSSHSecret = { _, _ in nil }
+        model.connections.deleteSecret = { deleted.saved.append("\($0.serverKey)/\($0.user)") }
+        model.connections.openConnectSheet()
+        model.connections.connectS3(accessKey: "GOODKEY", secretKey: "hunter2-secret-value", region: "eu-west-1", endpoint: "minio.local:9000", remember: true, save: true)
+        await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
+        await settle()
+        let minio = model.connections.saved.items.first
+        check("Save this connection adds it to the list", model.connections.saved.items.count == 1 && minio?.serverKey == "s3://minio.local:9000" && minio?.region == "eu-west-1",
+              "\(model.connections.saved.items)")
+        let stored = String(decoding: Prefs.defaults.data(forKey: "pane.savedConnections") ?? Data(), as: UTF8.self)
+        check("Settings hold the host, user name, and protocol, and no secret",
+              stored.contains("minio.local") && stored.contains("GOODKEY") && stored.contains("s3") && !stored.contains("hunter2"))
+        check("the secret went to the Keychain, under the server and key", kept.saved == ["minio.local:9000/GOODKEY"], "\(kept.saved)")
+        check("Connections lists it with its protocol icon, not dimmed while connected",
+              model.places.connectionRoots.first?.savedID == minio?.id && model.places.connectionRoots.first?.symbol == "shippingbox" && model.places.connectionRoots.first?.isOffline == false)
+
+        model.disconnect(serverKey: "s3://minio.local:9000")
+        await settle()
+        check("a saved server stays in the list, dimmed, when it is not connected",
+              model.places.connectionRoots.first { $0.savedID == minio?.id }?.isOffline == true && !model.router.serverKeys.contains("s3://minio.local:9000"))
+        model.openSavedConnection(serverKey: "s3://minio.local:9000")
+        await Wait.until { model.router.serverKeys.contains("s3://minio.local:9000") }
+        await settle()
+        check("clicking it connects with the saved settings and the Keychain's secret, and shows it",
+              model.router.serverKeys.contains("s3://minio.local:9000") && model.tab.isRemote && model.places.connectionRoots.first { $0.savedID == minio?.id }?.isOffline == false)
+
+        model.connections.record(SavedConnection(kind: .s3, host: "down.local", user: "GOODKEY", region: "us-east-1"), replacing: nil)
+        model.openSavedConnection(serverKey: "s3://down.local")
+        await Wait.until { model.connections.unableToConnect != nil }
+        check("a saved server that is offline says Unable to connect, and stays dimmed",
+              model.connections.unableToConnect?.name == "down.local (S3)" && model.connections.unableToConnect?.reason == "Unable to reach the server."
+              && model.places.connectionRoots.first { $0.name == "down.local (S3)" }?.isOffline == true, "\(String(describing: model.connections.unableToConnect))")
+        model.connections.unableToConnect = nil
+        model.connections.record(SavedConnection(kind: .sftp, host: "nopass.local", user: "me"), replacing: nil)
+        model.openSavedConnection(serverKey: "sftp://nopass.local")
+        await Wait.until { model.connections.unableToConnect != nil }
+        check("a saved server with no password in the Keychain says so", model.connections.unableToConnect?.reason == "Type the password.", "\(String(describing: model.connections.unableToConnect))")
+        model.connections.unableToConnect = nil
+
+        model.connections.openManageSheet()
+        check("Manage Connections opens its own view", model.connections.showManageSheet && !model.connections.showConnectSheet)
+        model.disconnect(serverKey: "s3://minio.local:9000")
+        if let minio {
+            model.connections.openEdit(minio)
+            check("Edit opens the sheet filled in from the saved settings",
+                  model.connections.showConnectSheet && !model.connections.showManageSheet && model.connections.kind == .s3
+                  && model.connections.prefill?.id == minio.id && model.connections.editingID == minio.id)
+            model.connections.connectS3(accessKey: "GOODKEY", secretKey: "", region: "eu-west-1", endpoint: "minio2.local:9000", remember: false, save: true, savedID: minio.id)
+            await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
+            await settle()
+            check("saving an edit changes that entry and keeps its place",
+                  model.connections.saved.items.count == 3 && model.connections.saved.items.first?.id == minio.id && model.connections.saved.items.first?.host == "minio2.local",
+                  "\(model.connections.saved.items.map(\.host))")
+            model.removeSavedConnection(minio.id)
+            await settle()
+            check("Remove deletes the saved entry, closes its connection, and deletes its Keychain item",
+                  model.connections.saved.items.count == 2 && !model.router.serverKeys.contains("s3://minio2.local:9000") && deleted.saved == ["s3://minio2.local:9000/GOODKEY"],
+                  "\(model.connections.saved.items.count) \(model.router.serverKeys) \(deleted.saved)")
+            let after = String(decoding: Prefs.defaults.data(forKey: "pane.savedConnections") ?? Data(), as: UTF8.self)
+            check("and the list in Settings no longer names it", !after.contains("minio2.local") && after.contains("down.local"))
+        }
+        for item in model.connections.saved.items { model.removeSavedConnection(item.id) }
+        check("removing the rest empties Connections", model.connections.saved.items.isEmpty && model.places.connectionRoots.map(\.name) == ["xfer (SFTP)"], "\(model.places.connectionRoots.map(\.name))")
+        model.connections.closeConnectSheet()
+        model.connections.showManageSheet = false
+
         model.disconnect(serverKey: "sftp://xfer")
         await settle()
         model.tab.go(to: c.docs)
@@ -437,7 +511,10 @@ private final class S3Log {
 /// Answers like S3 does: buckets for the good key, "InvalidAccessKeyId" for any other.
 private struct StubS3: S3Transport {
     let goodKey: String
+    /// A server that cannot be reached.
+    var down = false
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        if down { throw RemoteError.connectionLost }
         let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
         let ok = auth.contains("Credential=\(goodKey)/")
         let body = ok

@@ -31,6 +31,15 @@ struct ContentView: View {
         .sheet(isPresented: .init(get: { model.connections.showConnectSheet }, set: { if !$0 { model.connections.closeConnectSheet() } })) {
             ConnectSheet(model: model)
         }
+        .sheet(isPresented: .init(get: { model.connections.showManageSheet }, set: { model.connections.showManageSheet = $0 })) {
+            ManageConnectionsSheet(model: model)
+        }
+        .alert("Unable to connect to \(model.connections.unableToConnect?.name ?? "")",
+               isPresented: .init(get: { model.connections.unableToConnect != nil }, set: { if !$0 { model.connections.unableToConnect = nil } })) {
+            Button("OK") {}
+        } message: {
+            Text(model.connections.unableToConnect?.reason ?? "")
+        }
         .sheet(isPresented: .init(get: { model.propertiesURLs != nil }, set: { if !$0 { model.closeProperties() } })) {
             if let urls = model.propertiesURLs { PropertiesSheet(model: model, urls: urls) }
         }

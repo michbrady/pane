@@ -557,7 +557,8 @@ Acceptance:
 - [unit] Passwords and secret keys live in the Keychain only. Settings hold the host, user name, and protocol.
 - [self] Edit and Remove work. Removing a connection also deletes its Keychain item.
 - [self] A saved connection that is offline shows a dimmed row with "Unable to connect." when clicked.
-Status: todo
+Note: Connect to Server has a "Save this connection" switch (on by default) for FTP, SFTP, and S3. Saved connections list under Connections with a protocol icon, dimmed while not connected. A click on a dimmed row connects with the saved settings and the secret from the Keychain, and says "Unable to connect to <server>" with the reason if it cannot (a server never seen before opens the sheet to ask "Trust this server?"). "Manage Connections…" lists them with Edit and Remove; the row menu has both too. Edit fills the sheet in from the saved settings (never the password: leave it empty to use the Keychain's) and saving keeps the entry's place. Remove closes an open connection, deletes the entry, and deletes its Keychain item. Settings hold only the kind, host, port, user name (S3: access key), region, and key file path, as one JSON entry, and a unit test checks the saved list has no field for a secret. Not saved: SMB shares (they mount as volumes and have their Recent Servers list) and a custom display name. [manual] The Keychain itself (save, find, delete) against the real login keychain.
+Status: done
 
 ## M7 Polish
 

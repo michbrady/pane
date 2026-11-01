@@ -22,6 +22,21 @@ final class Connections {
         var note: String? { self == .plain ? "FTP sends your password without encryption." : nil }
     }
     var ftpProtocol = FTPProtocol.tls
+
+    // Saved connections (S-067). Settings only: the secret is in the Keychain.
+    var saved = SavedConnections(data: Prefs.defaults.data(forKey: "pane.savedConnections"))
+    var showManageSheet = false
+    /// What the sheet fills in when opened to edit a saved connection.
+    var prefill: SavedConnection?
+    var editingID: UUID?
+    /// A saved connection that could not be opened: its name, and why.
+    var unableToConnect: (name: String, reason: String)?
+    /// Called when the saved list changes, so the Navigation pane shows it.
+    var savedChanged: () -> Void = {}
+    /// Called after each attempt ends, win or lose. Opening a saved connection from the tree waits on it.
+    var afterAttempt: (() -> Void)?
+    /// Removes a saved connection's password or secret key from the Keychain. Tests swap it.
+    var deleteSecret: (SavedConnection) -> Void = { PasswordKeychain.delete(for: $0) }
     private(set) var isConnecting = false
     private(set) var connectError: String?
     private(set) var recentServers = RecentServers(Prefs.defaults.stringArray(forKey: "pane.recentServers") ?? [])
@@ -71,10 +86,18 @@ final class Connections {
     func openConnectSheet() {
         connectError = nil
         pendingTrust = nil
+        prefill = nil
+        editingID = nil
         showConnectSheet = true
     }
 
     func clearConnectError() { connectError = nil; pendingTrust = nil }
+
+    /// The error from the last attempt, once. For a caller that shows it somewhere other than the sheet.
+    func takeConnectError() -> String? {
+        defer { connectError = nil }
+        return connectError
+    }
 
     func closeConnectSheet() {
         showConnectSheet = false
@@ -130,7 +153,7 @@ final class Connections {
 
     /// Connect to S3: list the account's buckets to prove the keys work, then show them as folders.
     /// An empty Endpoint means AWS in the chosen Region. A saved secret is used when the field is left empty.
-    func connectS3(accessKey: String, secretKey: String, region: String, endpoint: String, remember: Bool) {
+    func connectS3(accessKey: String, secretKey: String, region: String, endpoint: String, remember: Bool, save: Bool = false, savedID: UUID? = nil) {
         guard !isConnecting else { return }
         let key = accessKey.trimmingCharacters(in: .whitespaces)
         let area = region.trimmingCharacters(in: .whitespaces).lowercased()
@@ -146,12 +169,14 @@ final class Connections {
         isConnecting = true
         let server = makeS3(endpointHost, area, .init(accessKey: key, secretKey: secret))
         Task {
-            defer { isConnecting = false }
+            defer { isConnecting = false; afterAttempt?() }
             do {
-                let top = RemoteURL.make(scheme: "s3", host: endpointHost.split(separator: ":").first.map(String.init) ?? endpointHost,
-                                         port: endpointHost.split(separator: ":").dropFirst().first.flatMap { Int($0) })
+                let hostName = endpointHost.split(separator: ":").first.map(String.init) ?? endpointHost
+                let hostPort = endpointHost.split(separator: ":").dropFirst().first.flatMap { Int($0) }
+                let top = RemoteURL.make(scheme: "s3", host: hostName, port: hostPort)
                 _ = try await server.list(top)
                 if remember { saveSecret(secret, endpointHost, key) }
+                if save { record(SavedConnection(kind: .s3, host: hostName, port: hostPort, user: key, region: area), replacing: savedID) }
                 showConnectSheet = false
                 didConnect(server, top)
             } catch let error as RemoteError {
@@ -164,7 +189,8 @@ final class Connections {
 
     /// Connect to SFTP: sign in, and start in the folder the server starts in. A server not seen before
     /// asks "Trust this server?" first. A changed key stops with a warning.
-    func connectSFTP(host rawHost: String, port rawPort: String, user rawUser: String, useKey: Bool, keyPath: String, secret: String, remember: Bool) {
+    func connectSFTP(host rawHost: String, port rawPort: String, user rawUser: String, useKey: Bool, keyPath: String, secret: String, remember: Bool,
+                     save: Bool = false, savedID: UUID? = nil) {
         guard !isConnecting else { return }
         let host = rawHost.trimmingCharacters(in: .whitespaces)
         let user = rawUser.trimmingCharacters(in: .whitespaces)
@@ -187,10 +213,11 @@ final class Connections {
         isConnecting = true
         let attempt: () -> Void = { [unowned self] in
             Task {
-                defer { isConnecting = false }
+                defer { isConnecting = false; afterAttempt?() }
                 do {
                     let start = try await server.start()
                     if remember, !secretText.isEmpty { saveSSHSecret(secretText, host, user) }
+                    if save { record(SavedConnection(kind: .sftp, host: host, port: port, user: user, useKey: useKey, keyPath: useKey ? keyPath : nil), replacing: savedID) }
                     showConnectSheet = false
                     didConnect(server, RemoteURL.make(scheme: "sftp", host: host, port: port, path: start))
                 } catch RemoteError.unknownHostKey(let fingerprint, let keyLine) {
@@ -222,7 +249,8 @@ final class Connections {
     }
 
     /// Connect to FTP: sign in, then show the server's top folder.
-    func connectFTP(host rawHost: String, port rawPort: String, user rawUser: String, password: String, protocol choice: FTPProtocol, remember: Bool) {
+    func connectFTP(host rawHost: String, port rawPort: String, user rawUser: String, password: String, protocol choice: FTPProtocol, remember: Bool,
+                    save: Bool = false, savedID: UUID? = nil) {
         guard !isConnecting else { return }
         let host = rawHost.trimmingCharacters(in: .whitespaces)
         let user = rawUser.trimmingCharacters(in: .whitespaces)
@@ -242,10 +270,11 @@ final class Connections {
         isConnecting = true
         let server = makeFTP(host, port, user, secret, secure)
         Task {
-            defer { isConnecting = false }
+            defer { isConnecting = false; afterAttempt?() }
             do {
                 let start = try await server.start()
                 if remember { saveFTPSecret(secret, host, user, secure) }
+                if save { record(SavedConnection(kind: secure ? .ftps : .ftp, host: host, port: port, user: user), replacing: savedID) }
                 showConnectSheet = false
                 didConnect(server, RemoteURL.make(scheme: secure ? "ftps" : "ftp", host: host, port: port, path: start))
             } catch let error as RemoteError {
