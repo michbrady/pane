@@ -23,5 +23,17 @@ extension SelfTest {
         check("Rename dims with two items selected", !model.actions.canRename)
         check("every sort key has a name", SortKey.allCases.allSatisfy { !$0.title.isEmpty })
         model.tab.selection = []
+
+        // S-045 Open in Terminal
+        model.tab.go(to: docs)
+        await settle()
+        check("Terminal is installed, so Open in Terminal is available", model.canOpenInTerminal)
+        let work = model.tab.items.first { $0.name == "Work" }
+        model.tab.selection = Set([work?.url].compactMap { $0 })
+        check("with a folder selected, Terminal opens that folder",
+              OpenInTerminal.folder(selected: model.tab.selectedItems, current: model.tab.currentFolder).lastPathComponent == "Work")
+        model.tab.selection = []
+        check("with nothing selected, Terminal opens the folder shown",
+              OpenInTerminal.folder(selected: model.tab.selectedItems, current: model.tab.currentFolder) == model.tab.currentFolder)
     }
 }

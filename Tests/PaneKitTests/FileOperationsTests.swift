@@ -430,6 +430,16 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(!FileSearch.matches("notes.txt", "memo"))
 }
 
+@Test func openInTerminalPicksTheRightFolder() {
+    let current = URL(fileURLWithPath: "/Users/me/Documents")
+    let folder = item("Work", folder: true)
+    let file = item("notes.txt", size: 1)
+    #expect(OpenInTerminal.folder(selected: [], current: current) == current)
+    #expect(OpenInTerminal.folder(selected: [folder], current: current) == folder.url)
+    #expect(OpenInTerminal.folder(selected: [file], current: current).path == "/x")
+    #expect(OpenInTerminal.folder(selected: [folder, file], current: current) == current)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

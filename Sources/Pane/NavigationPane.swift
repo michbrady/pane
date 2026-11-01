@@ -54,6 +54,7 @@ private struct NavRow: View {
         .onMiddleClick { model.newTab(at: node.url) }
         .contextMenu {
             Button("Open in New Tab") { model.newTab(at: node.url) }
+            Button("Open in Terminal") { model.openInTerminal(node.url) }
             if model.isPinned(node.url) {
                 Button("Unpin from Quick access") { model.unpin(node.url) }
             } else {

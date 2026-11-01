@@ -157,6 +157,7 @@ struct ItemMenu: View {
                 Button("Rename") { model.actions.beginRename() }
                 if let folder = model.tab.items.first(where: { urls.contains($0.url) && $0.isFolder }) {
                     Button("Open in New Tab") { model.newTab(at: folder.url) }
+                    Button("Open in Terminal") { model.openInTerminal(folder.url) }
                     if model.isPinned(folder.url) {
                         Button("Unpin from Quick access") { model.unpin(folder.url) }
                     } else {

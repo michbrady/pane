@@ -451,7 +451,8 @@ As the user, I right-click a folder and choose Open in Terminal.
 Depends: S-003
 Acceptance:
 - [self] Terminal opens at that folder.
-Status: todo
+Note: the choice of folder is unit tested and Terminal's presence is checked. The tests do not launch Terminal, so try "Open in Terminal" by hand [manual].
+Status: done
 
 
 ## M6 Remote servers

@@ -36,6 +36,8 @@ struct PaneApp: App {
                     .keyboardShortcut("n", modifiers: [.command, .shift])
                 Button("Quick Look") { model.toggleQuickLook() }
                     .disabled(model.tab.selection.isEmpty)
+                Button("Open in Terminal") { model.openInTerminal() }
+                    .disabled(!model.canOpenInTerminal)
                 Button("Properties") { model.showProperties() }
                     .keyboardShortcut("i")
                 Button("Rename") { model.actions.beginRename() }

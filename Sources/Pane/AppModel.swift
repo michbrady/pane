@@ -142,6 +142,21 @@ final class AppModel {
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
 
+    // MARK: Terminal
+
+    /// Opens Terminal in a folder: the selected folder, else the folder shown.
+    func openInTerminal(_ folder: URL? = nil) {
+        let target = folder ?? OpenInTerminal.folder(selected: tab.selectedItems, current: tab.currentFolder)
+        guard let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
+            actions.alertMessage = "Terminal was not found on this Mac."
+            return
+        }
+        NSWorkspace.shared.open([target], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    /// True when Terminal is installed.
+    var canOpenInTerminal: Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") != nil }
+
     // MARK: Quick Look
 
     /// Space: open Quick Look for the selected items, or close it if it is open.
