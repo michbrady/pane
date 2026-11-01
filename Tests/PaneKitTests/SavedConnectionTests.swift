@@ -31,3 +31,51 @@ import Testing
     #expect(removed?.host == "other.local" && list.items.isEmpty)
     #expect(list.connection(forServerKey: "sftp://other.local") == nil)
 }
+
+// MARK: Checking the connect form
+
+private func message(_ form: ConnectionForm, _ store: SecretStore = InMemorySecretStore()) -> String? {
+    if case .failure(let error) = form.validated(store: store) { return error.message }
+    return nil
+}
+
+@Test func theFormSaysWhatIsMissingInTheOrderTheFieldsAppear() {
+    var sftp = ConnectionForm(kind: .sftp)
+    #expect(message(sftp) == "Type the server name, like nas.local.")
+    sftp.host = "nas.local"; sftp.port = "99999"
+    #expect(message(sftp) == "The port is a number from 1 to 65535.")
+    sftp.port = ""
+    #expect(message(sftp) == "Type the user name.")
+    sftp.user = "me"; sftp.useKey = true
+    #expect(message(sftp) == "Choose a key file.")
+    sftp.useKey = false
+    #expect(message(sftp) == "Type the password.")
+    #expect(message(ConnectionForm(kind: .ftps)) == "Type the server name, like ftp.example.com.")
+    var s3 = ConnectionForm(kind: .s3)
+    #expect(message(s3) == "Type the access key.")
+    s3.user = "AKIA"
+    #expect(message(s3) == "Type the region, like us-east-1.")
+    s3.region = "us-east-1"
+    #expect(message(s3) == "Type the secret key.")
+}
+
+@Test func theFormUsesTheStoredSecretAndBuildsTheConnection() throws {
+    let store = InMemorySecretStore()
+    store.preload("kept", forKey: "s3://minio.local:9000/AKIA")
+    var s3 = ConnectionForm(kind: .s3)
+    s3.user = " AKIA "; s3.region = "EU-West-1"; s3.endpoint = "https://minio.local:9000/"
+    let valid = try s3.validated(store: store).get()
+    #expect(valid.secret == "kept" && valid.endpoint == "minio.local:9000" && valid.connection.region == "eu-west-1" && valid.connection.user == "AKIA")
+    s3.endpoint = ""
+    #expect(try s3.validated(store: InMemorySecretStore().self).failureMessage == "Type the secret key.")
+    var typed = s3; typed.secret = "typed"
+    #expect(try typed.validated(store: InMemorySecretStore()).get().connection.host == "s3.eu-west-1.amazonaws.com")
+    var key = ConnectionForm(kind: .sftp)
+    key.host = "NAS.local"; key.user = "me"; key.useKey = true; key.keyPath = "/k"
+    let withKey = try key.validated(store: store).get()
+    #expect(withKey.secret.isEmpty && withKey.connection.useKey && withKey.connection.keyPath == "/k" && withKey.connection.serverKey == "sftp://nas.local")
+}
+
+private extension Result where Failure == ConnectionForm.FormError {
+    var failureMessage: String? { if case .failure(let error) = self { error.message } else { nil } }
+}

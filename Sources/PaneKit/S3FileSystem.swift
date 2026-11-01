@@ -96,7 +96,9 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
         serverKey = "s3://" + host + (port.map { ":\($0)" } ?? "")
     }
 
-    public func reconnect() async throws { _ = try await buckets() }
+    /// Lists the account's buckets, which proves the keys work. The top is where to start.
+    public func start() async throws -> String { _ = try await buckets(); return "/" }
+    public func reconnect() async throws { _ = try await start() }
     public func disconnect() async {}
 
     public func exists(_ url: URL) async -> Bool { await RemoteTree.exists(url, in: self) }

@@ -88,12 +88,30 @@ extension SelfTest {
         await settle()
 
         // S-063 Connect to an S3 account (a stub stands in for the network and the Keychain)
-        let s3Log = S3Log()
-        model.connections.makeS3 = { endpoint, region, credentials in
-            S3FileSystem(endpoint: endpoint, region: region, credentials: credentials, transport: StubS3(goodKey: "GOODKEY"))
+        // One stand-in for the network and one for the Keychain serve every connect check below.
+        let known = c.home.appending(path: "sftp-known-hosts")
+        try? FileManager.default.removeItem(at: known)
+        let secrets = InMemorySecretStore()
+        secrets.preload("stored-secret", forKey: "s3://s3.us-east-1.amazonaws.com/GOODKEY")
+        secrets.preload("stored-secret", forKey: "s3://minio2.local:9000/GOODKEY")
+        secrets.preload("stored-secret", forKey: "s3://down.local/GOODKEY")
+        model.connections.secrets = secrets
+        model.connections.makeServer = { valid in
+            let connection = valid.connection
+            switch connection.kind {
+            case .s3:
+                return S3FileSystem(endpoint: valid.endpoint, region: connection.region ?? "us-east-1",
+                                    credentials: .init(accessKey: connection.user, secretKey: valid.secret),
+                                    transport: StubS3(goodKey: "GOODKEY", down: connection.host.hasPrefix("down")))
+            case .sftp:
+                return SFTPFileSystem(host: connection.host, port: connection.port, user: connection.user,
+                                      login: connection.useKey ? .key(path: connection.keyPath ?? "", passphrase: valid.secret) : .password(valid.secret),
+                                      knownHosts: known, workFolder: URL(fileURLWithPath: "/tmp/pane-ssh-selftest"), runner: ScriptedSFTP(known: known))
+            case .ftp, .ftps:
+                return FTPFileSystem(host: connection.host, port: connection.port, user: connection.user, password: valid.secret,
+                                     secure: connection.kind == .ftps, runner: ScriptedFTP(goodPassword: "ftp-pw"))
+            }
         }
-        model.connections.saveSecret = { _, server, account in s3Log.saved.append("\(server)/\(account)") }
-        model.connections.savedSecret = { _, account in account == "GOODKEY" ? "stored-secret" : nil }
         model.connections.openConnectSheet()
         model.connections.connectS3(accessKey: "", secretKey: "x", region: "us-east-1", endpoint: "", remember: false)
         check("S3 asks for the access key", model.connections.connectError == "Type the access key.")
@@ -107,7 +125,7 @@ extension SelfTest {
         check("a wrong key says Access denied. and keeps the sheet open",
               model.connections.connectError == "Access denied." && model.connections.showConnectSheet && model.router.serverKeys.isEmpty,
               model.connections.connectError ?? "nil")
-        check("a wrong key is not saved to the Keychain", s3Log.saved.isEmpty)
+        check("a wrong key is not saved to the Keychain", secrets.savedKeys.isEmpty)
         model.connections.connectS3(accessKey: "GOODKEY", secretKey: "secret", region: "eu-west-1", endpoint: "https://minio.local:9000/", remember: true)
         await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
         await settle()
@@ -115,20 +133,12 @@ extension SelfTest {
               !model.connections.showConnectSheet && model.tab.isRemote && model.tab.items.map(\.name) == ["photos"] && model.tab.items.first?.isFolder == true,
               "\(model.tab.currentFolder) \(model.tab.items.map(\.name))")
         check("the endpoint decides the server", model.router.serverKeys == ["s3://minio.local:9000"], "\(model.router.serverKeys)")
-        check("Remember saves the secret under the endpoint and key", s3Log.saved == ["minio.local:9000/GOODKEY"], "\(s3Log.saved)")
+        check("Remember saves the secret under the endpoint and key", secrets.savedKeys == ["s3://minio.local:9000/GOODKEY"], "\(secrets.savedKeys)")
         model.disconnect(serverKey: "s3://minio.local:9000")
         await settle()
 
         // S-062 Connect to an SFTP server (a script stands in for sftp, ssh-keyscan, and the Keychain)
-        let known = c.home.appending(path: "sftp-known-hosts")
-        try? FileManager.default.removeItem(at: known)
-        let sftpLog = S3Log()
-        model.connections.makeSFTP = { host, port, user, login in
-            SFTPFileSystem(host: host, port: port, user: user, login: login, knownHosts: known,
-                           workFolder: URL(fileURLWithPath: "/tmp/pane-ssh-selftest"), runner: ScriptedSFTP(known: known))
-        }
-        model.connections.saveSSHSecret = { _, server, account in sftpLog.saved.append("\(server)/\(account)") }
-        model.connections.savedSSHSecret = { _, _ in nil }
+        let sftpBase = secrets.savedKeys.count
         model.connections.openConnectSheet()
         model.connections.connectSFTP(host: "", port: "", user: "me", useKey: false, keyPath: "", secret: "pw", remember: false)
         check("SFTP asks for the server name", model.connections.connectError == "Type the server name, like nas.local.")
@@ -147,7 +157,7 @@ extension SelfTest {
               model.connections.pendingTrust?.fingerprint == "SHA256:fp123" && model.connections.showConnectSheet && model.router.serverKeys.isEmpty,
               "\(String(describing: model.connections.pendingTrust))")
         check("nothing is saved or trusted until the person says so",
-              sftpLog.saved.isEmpty && !FileManager.default.fileExists(atPath: known.path))
+              secrets.savedKeys.count == sftpBase && !FileManager.default.fileExists(atPath: known.path))
         model.connections.declinePendingServer()
         check("Don't Trust closes the question and connects to nothing", model.connections.pendingTrust == nil && model.router.serverKeys.isEmpty)
 
@@ -161,7 +171,7 @@ extension SelfTest {
               "\(model.router.serverKeys) \(model.tab.currentFolder)")
         check("the folder lists folders and files from the server", model.tab.items.map(\.name) == ["My Docs", "notes.txt"], "\(model.tab.items.map(\.name))")
         check("the key is in Pane's own list, not ~/.ssh", ((try? String(contentsOf: known, encoding: .utf8)) ?? "").contains("ssh-ed25519 AAAAed"))
-        check("Remember saves the password under the server and user", sftpLog.saved == ["nas.local/me"], "\(sftpLog.saved)")
+        check("Remember saves the password under the server and user", Array(secrets.savedKeys.dropFirst(sftpBase)) == ["sftp://nas.local/me"], "\(secrets.savedKeys)")
         model.disconnect(serverKey: "sftp://nas.local")
         await settle()
 
@@ -173,23 +183,18 @@ extension SelfTest {
               model.connections.connectError ?? "nil")
         model.connections.connectSFTP(host: "deny.local", port: "", user: "me", useKey: false, keyPath: "", secret: "wrong", remember: true)
         await Wait.until { !model.connections.isConnecting }
-        check("a wrong password says Access denied. and saves nothing", model.connections.connectError == "Access denied." && sftpLog.saved == ["nas.local/me"])
+        check("a wrong password says Access denied. and saves nothing", model.connections.connectError == "Access denied." && Array(secrets.savedKeys.dropFirst(sftpBase)) == ["sftp://nas.local/me"])
         model.connections.closeConnectSheet()
 
         // S-061 Connect to an FTP server (a script stands in for curl and the Keychain)
-        let ftpLog = S3Log()
-        model.connections.makeFTP = { host, port, user, password, secure in
-            FTPFileSystem(host: host, port: port, user: user, password: password, secure: secure, runner: ScriptedFTP(goodPassword: "ftp-pw"))
-        }
-        model.connections.saveFTPSecret = { _, server, account, secure in ftpLog.saved.append("\(secure ? "ftps" : "ftp")://\(server)/\(account)") }
-        model.connections.savedFTPSecret = { _, _, _ in nil }
+        let ftpBase = secrets.savedKeys.count
         check("FTP with TLS is the first choice", Connections.FTPProtocol.allCases.first == .tls && model.connections.ftpProtocol == .tls)
         check("plain FTP says it sends the password without encryption", Connections.FTPProtocol.plain.note == "FTP sends your password without encryption.")
         check("FTP with TLS shows no such note", Connections.FTPProtocol.tls.note == nil)
         model.connections.openConnectSheet()
         model.connections.connectFTP(host: "ftp.example.com", port: "", user: "me", password: "wrong", protocol: .tls, remember: true)
         await Wait.until { !model.connections.isConnecting }
-        check("a wrong FTP password says Access denied. and saves nothing", model.connections.connectError == "Access denied." && ftpLog.saved.isEmpty)
+        check("a wrong FTP password says Access denied. and saves nothing", model.connections.connectError == "Access denied." && secrets.savedKeys.count == ftpBase)
         model.connections.connectFTP(host: "ftp.example.com", port: "", user: "me", password: "", protocol: .tls, remember: false)
         check("FTP asks for the password", model.connections.connectError == "Type the password.")
         model.connections.connectFTP(host: "ftp.example.com", port: "2121", user: "me", password: "ftp-pw", protocol: .tls, remember: true)
@@ -197,7 +202,7 @@ extension SelfTest {
         await settle()
         check("FTP with TLS connects, lists the top folder, and keeps the address", model.router.serverKeys == ["ftps://ftp.example.com:2121"] && model.tab.items.map(\.name) == ["Public", "readme.txt"],
               "\(model.router.serverKeys) \(model.tab.items.map(\.name))")
-        check("Remember saves the password under the server and user", ftpLog.saved == ["ftps://ftp.example.com/me"], "\(ftpLog.saved)")
+        check("Remember saves the password under the server and user", Array(secrets.savedKeys.dropFirst(ftpBase)) == ["ftps://ftp.example.com:2121/me"], "\(secrets.savedKeys)")
         model.disconnect(serverKey: "ftps://ftp.example.com:2121")
         await settle()
 
@@ -315,6 +320,8 @@ extension SelfTest {
         await Wait.until { model.actions.renameError != nil }
         check("a name already taken on the server says so", model.actions.renameError == "An item with this name already exists.", model.actions.renameError ?? "nil")
         model.actions.cancelRename()
+        await settle()
+        NSApp.keyWindow?.makeFirstResponder(nil)   // a cancelled rename field can keep focus, and Delete steps aside for a field
 
         model.tab.selection = [place("/Inbox/keep.bin"), place("/Inbox/big.bin"), place("/Inbox/Reports")]
         model.actions.trashSelection()
@@ -382,15 +389,7 @@ extension SelfTest {
         model.actions.alertMessage = nil
 
         // S-067 Save connections (stubs stand in for the network and the Keychain)
-        let deleted = S3Log()
-        let kept = S3Log()
-        model.connections.makeS3 = { endpoint, region, credentials in
-            S3FileSystem(endpoint: endpoint, region: region, credentials: credentials, transport: StubS3(goodKey: "GOODKEY", down: endpoint.hasPrefix("down")))
-        }
-        model.connections.saveSecret = { _, server, account in kept.saved.append("\(server)/\(account)") }
-        model.connections.savedSecret = { _, account in account == "GOODKEY" ? "stored-secret" : nil }
-        model.connections.savedSSHSecret = { _, _ in nil }
-        model.connections.deleteSecret = { deleted.saved.append("\($0.serverKey)/\($0.user)") }
+        let keptBase = secrets.savedKeys.count
         model.connections.openConnectSheet()
         model.connections.connectS3(accessKey: "GOODKEY", secretKey: "hunter2-secret-value", region: "eu-west-1", endpoint: "minio.local:9000", remember: true, save: true)
         await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
@@ -401,7 +400,7 @@ extension SelfTest {
         let stored = String(decoding: Prefs.defaults.data(forKey: "pane.savedConnections") ?? Data(), as: UTF8.self)
         check("Settings hold the host, user name, and protocol, and no secret",
               stored.contains("minio.local") && stored.contains("GOODKEY") && stored.contains("s3") && !stored.contains("hunter2"))
-        check("the secret went to the Keychain, under the server and key", kept.saved == ["minio.local:9000/GOODKEY"], "\(kept.saved)")
+        check("the secret went to the Keychain, under the server and key", Array(secrets.savedKeys.dropFirst(keptBase)) == ["s3://minio.local:9000/GOODKEY"], "\(secrets.savedKeys)")
         check("Connections lists it with its protocol icon, not dimmed while connected",
               model.places.connectionRoots.first?.savedID == minio?.id && model.places.connectionRoots.first?.symbol == "shippingbox" && model.places.connectionRoots.first?.isOffline == false)
 
@@ -445,8 +444,8 @@ extension SelfTest {
             model.removeSavedConnection(minio.id)
             await settle()
             check("Remove deletes the saved entry, closes its connection, and deletes its Keychain item",
-                  model.connections.saved.items.count == 2 && !model.router.serverKeys.contains("s3://minio2.local:9000") && deleted.saved == ["s3://minio2.local:9000/GOODKEY"],
-                  "\(model.connections.saved.items.count) \(model.router.serverKeys) \(deleted.saved)")
+                  model.connections.saved.items.count == 2 && !model.router.serverKeys.contains("s3://minio2.local:9000") && secrets.deletedKeys == ["s3://minio2.local:9000/GOODKEY"],
+                  "\(model.connections.saved.items.count) \(model.router.serverKeys) \(secrets.deletedKeys)")
             let after = String(decoding: Prefs.defaults.data(forKey: "pane.savedConnections") ?? Data(), as: UTF8.self)
             check("and the list in Settings no longer names it", !after.contains("minio2.local") && after.contains("down.local"))
         }
@@ -502,10 +501,6 @@ private struct ScriptedSFTP: ProcessRunner {
 
 private final class Opened {
     var url: URL?
-}
-
-private final class S3Log {
-    var saved: [String] = []
 }
 
 /// Answers like S3 does: buckets for the good key, "InvalidAccessKeyId" for any other.

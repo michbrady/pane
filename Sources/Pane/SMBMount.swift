@@ -46,18 +46,15 @@ enum PasswordKeychain {
         SecItemDelete(query(server: server, account: account, proto: proto) as CFDictionary)
     }
 
-    /// Removes the password or secret key saved for a connection.
-    static func delete(for connection: SavedConnection) {
-        let proto: CFString
+    /// Where a connection's secret is filed: the server name and the Keychain's protocol for its kind.
+    /// S3 files under the endpoint with its port, the others under the host.
+    static func target(for connection: SavedConnection) -> (server: String, proto: CFString) {
         switch connection.kind {
-        case .s3: proto = kSecAttrProtocolHTTPS
-        case .sftp: proto = kSecAttrProtocolSSH
-        case .ftp: proto = kSecAttrProtocolFTP
-        case .ftps: proto = kSecAttrProtocolFTPS
+        case .s3: (connection.host + (connection.port.map { ":\($0)" } ?? ""), kSecAttrProtocolHTTPS)
+        case .sftp: (connection.host, kSecAttrProtocolSSH)
+        case .ftp: (connection.host, kSecAttrProtocolFTP)
+        case .ftps: (connection.host, kSecAttrProtocolFTPS)
         }
-        // S3 files its secret under the endpoint with its port, like the connect flow does.
-        let server = connection.kind == .s3 ? connection.host + (connection.port.map { ":\($0)" } ?? "") : connection.host
-        delete(server: server, account: connection.user, proto: proto)
     }
 
     static func password(server: String, account: String, proto: CFString = kSecAttrProtocolSMB) -> String? {
@@ -67,5 +64,23 @@ enum PasswordKeychain {
         var result: AnyObject?
         guard SecItemCopyMatching(request as CFDictionary, &result) == errSecSuccess, let data = result as? Data else { return nil }
         return String(decoding: data, as: UTF8.self)
+    }
+}
+
+/// The Keychain as a `SecretStore`: passwords and secret keys for FTP, SFTP, and S3 connections.
+final class KeychainSecretStore: SecretStore {
+    func save(_ secret: String, for connection: SavedConnection) {
+        let target = PasswordKeychain.target(for: connection)
+        PasswordKeychain.save(secret, server: target.server, account: connection.user, proto: target.proto)
+    }
+
+    func secret(for connection: SavedConnection) -> String? {
+        let target = PasswordKeychain.target(for: connection)
+        return PasswordKeychain.password(server: target.server, account: connection.user, proto: target.proto)
+    }
+
+    func delete(for connection: SavedConnection) {
+        let target = PasswordKeychain.target(for: connection)
+        PasswordKeychain.delete(server: target.server, account: connection.user, proto: target.proto)
     }
 }

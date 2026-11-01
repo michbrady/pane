@@ -52,10 +52,12 @@ public struct SavedConnection: Codable, Equatable, Identifiable, Sendable {
         self.keyPath = keyPath
     }
 
+    /// "sftp", "ftp", "ftps", or "s3".
+    public var scheme: String { kind.rawValue }
+
     /// What the router files the open connection under, like "sftp://nas".
     public var serverKey: String {
-        let scheme = kind == .s3 ? "s3" : kind.rawValue
-        return "\(scheme)://\(host)" + (port.map { ":\($0)" } ?? "")
+        "\(scheme)://\(host)" + (port.map { ":\($0)" } ?? "")
     }
 
     /// "nas (SFTP)".
@@ -65,7 +67,7 @@ public struct SavedConnection: Codable, Equatable, Identifiable, Sendable {
     public var detail: String { kind == .s3 ? "Access key \(user)" : "\(user)@\(host)" }
 
     /// The place to open: the top of the server.
-    public var address: URL { RemoteURL.make(scheme: kind == .s3 ? "s3" : kind.rawValue, host: host, port: port) }
+    public var address: URL { RemoteURL.make(scheme: scheme, host: host, port: port) }
 
     /// Same server and same sign-in, so saving it again updates the entry instead of adding one.
     func matches(_ other: SavedConnection) -> Bool {

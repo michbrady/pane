@@ -18,7 +18,7 @@ extension Connections {
     /// Remove deletes the entry and its Keychain item.
     func remove(_ id: UUID) {
         guard let removed = saved.remove(id) else { return }
-        deleteSecret(removed)
+        secrets.delete(for: removed)
         persistSaved()
     }
 

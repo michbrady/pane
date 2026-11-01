@@ -44,6 +44,8 @@ public protocol RemoteFileSystem: FileSystem {
     /// `scheme://host:port`, the key the router files this connection under.
     var serverKey: String { get }
     /// Opens the connection again after it was lost.
+    /// Signs in, and returns the folder to open first. Throws what `list` would for a bad login.
+    func start() async throws -> String
     func reconnect() async throws
     func disconnect() async
 }
@@ -127,6 +129,7 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
     /// Makes listings slow, so a test can see the loading state.
     public func slowDown(by delay: Duration) { lock.withLock { listDelay = delay } }
 
+    public func start() async throws -> String { "/" }
     public func reconnect() async throws { lock.withLock { lost = false } }
     public func disconnect() async { lock.withLock { lost = true } }
 

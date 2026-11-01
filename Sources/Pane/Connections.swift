@@ -35,8 +35,6 @@ final class Connections {
     var savedChanged: () -> Void = {}
     /// Called after each attempt ends, win or lose. Opening a saved connection from the tree waits on it.
     var afterAttempt: (() -> Void)?
-    /// Removes a saved connection's password or secret key from the Keychain. Tests swap it.
-    var deleteSecret: (SavedConnection) -> Void = { PasswordKeychain.delete(for: $0) }
     private(set) var isConnecting = false
     private(set) var connectError: String?
     private(set) var recentServers = RecentServers(Prefs.defaults.stringArray(forKey: "pane.recentServers") ?? [])
@@ -46,20 +44,24 @@ final class Connections {
     var savedPassword: (String, String) -> String? = { PasswordKeychain.password(server: $0, account: $1) }
     /// Called with where a new share appeared. AppModel refreshes the places and shows it.
     var didMount: (URL) -> Void = { _ in }
-    /// Builds the S3 file system. Tests give one that talks to a stub, never the network.
-    var makeS3: (String, String, S3Signer.Credentials) -> S3FileSystem = { endpoint, region, credentials in
-        S3FileSystem(endpoint: endpoint, region: region, credentials: credentials)
+    /// Passwords and secret keys. The Keychain, or memory when a test or snapshot runs.
+    var secrets: SecretStore = Locations.isOverridden ? InMemorySecretStore() : KeychainSecretStore()
+    /// Builds the file system for a checked form. Tests give one that answers from a script, never the network.
+    var makeServer: (ConnectionForm.Valid) -> any RemoteFileSystem = { valid in
+        let connection = valid.connection
+        switch connection.kind {
+        case .s3:
+            return S3FileSystem(endpoint: valid.endpoint, region: connection.region ?? "us-east-1",
+                                credentials: .init(accessKey: connection.user, secretKey: valid.secret))
+        case .sftp:
+            return SFTPFileSystem(host: connection.host, port: connection.port, user: connection.user,
+                                  login: connection.useKey ? .key(path: connection.keyPath ?? "", passphrase: valid.secret) : .password(valid.secret),
+                                  knownHosts: Locations.home.appending(path: "Library/Application Support/Pane/known_hosts"),
+                                  workFolder: URL(fileURLWithPath: "/tmp/pane-ssh-\(getuid())", isDirectory: true))
+        case .ftp, .ftps:
+            return FTPFileSystem(host: connection.host, port: connection.port, user: connection.user, password: valid.secret, secure: connection.kind == .ftps)
+        }
     }
-    var saveSecret: (String, String, String) -> Void = { PasswordKeychain.save($0, server: $1, account: $2, proto: kSecAttrProtocolHTTPS) }
-    var savedSecret: (String, String) -> String? = { PasswordKeychain.password(server: $0, account: $1, proto: kSecAttrProtocolHTTPS) }
-    /// Builds the SFTP file system. Tests give one that runs a script, never `sftp`.
-    var makeSFTP: (String, Int?, String, SFTPFileSystem.Login) -> SFTPFileSystem = { host, port, user, login in
-        SFTPFileSystem(host: host, port: port, user: user, login: login,
-                       knownHosts: Locations.home.appending(path: "Library/Application Support/Pane/known_hosts"),
-                       workFolder: URL(fileURLWithPath: "/tmp/pane-ssh-\(getuid())", isDirectory: true))
-    }
-    var saveSSHSecret: (String, String, String) -> Void = { PasswordKeychain.save($0, server: $1, account: $2, proto: kSecAttrProtocolSSH) }
-    var savedSSHSecret: (String, String) -> String? = { PasswordKeychain.password(server: $0, account: $1, proto: kSecAttrProtocolSSH) }
     /// A server Pane has not seen. The sheet asks "Trust this server?" with this fingerprint.
     struct PendingTrust: Equatable {
         let host: String
@@ -68,17 +70,7 @@ final class Connections {
     }
     private(set) var pendingTrust: PendingTrust?
     private var resumeAfterTrust: (() -> Void)?
-    private var trustServer: SFTPFileSystem?
-
-    var makeFTP: (String, Int?, String, String, Bool) -> FTPFileSystem = { host, port, user, password, secure in
-        FTPFileSystem(host: host, port: port, user: user, password: password, secure: secure)
-    }
-    var saveFTPSecret: (String, String, String, Bool) -> Void = {
-        PasswordKeychain.save($0, server: $1, account: $2, proto: $3 ? kSecAttrProtocolFTPS : kSecAttrProtocolFTP)
-    }
-    var savedFTPSecret: (String, String, Bool) -> String? = {
-        PasswordKeychain.password(server: $0, account: $1, proto: $2 ? kSecAttrProtocolFTPS : kSecAttrProtocolFTP)
-    }
+    private var trustServer: (any RemoteFileSystem)?
 
     /// Called with a server that is connected and listed, and the place to show.
     var didConnect: (any RemoteFileSystem, URL) -> Void = { _, _ in }
@@ -151,77 +143,31 @@ final class Connections {
         }
     }
 
-    /// Connect to S3: list the account's buckets to prove the keys work, then show them as folders.
-    /// An empty Endpoint means AWS in the chosen Region. A saved secret is used when the field is left empty.
-    func connectS3(accessKey: String, secretKey: String, region: String, endpoint: String, remember: Bool, save: Bool = false, savedID: UUID? = nil) {
+    /// Connect to an FTP, SFTP, or S3 server: check the form, sign in, then show the server's first folder.
+    /// A server not seen before (SFTP) asks "Trust this server?" first. A changed key stops with a warning.
+    func connect(_ form: ConnectionForm, remember: Bool, save: Bool = false, savedID: UUID? = nil) {
         guard !isConnecting else { return }
-        let key = accessKey.trimmingCharacters(in: .whitespaces)
-        let area = region.trimmingCharacters(in: .whitespaces).lowercased()
-        let host = endpoint.trimmingCharacters(in: .whitespaces)
-            .replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard !key.isEmpty else { connectError = "Type the access key."; return }
-        guard !area.isEmpty else { connectError = "Type the region, like us-east-1."; return }
-        let endpointHost = host.isEmpty ? "s3.\(area).amazonaws.com" : host
-        let secret = secretKey.isEmpty ? savedSecret(endpointHost, key) ?? "" : secretKey
-        guard !secret.isEmpty else { connectError = "Type the secret key."; return }
-        connectError = nil
-        isConnecting = true
-        let server = makeS3(endpointHost, area, .init(accessKey: key, secretKey: secret))
-        Task {
-            defer { isConnecting = false; afterAttempt?() }
-            do {
-                let hostName = endpointHost.split(separator: ":").first.map(String.init) ?? endpointHost
-                let hostPort = endpointHost.split(separator: ":").dropFirst().first.flatMap { Int($0) }
-                let top = RemoteURL.make(scheme: "s3", host: hostName, port: hostPort)
-                _ = try await server.list(top)
-                if remember { saveSecret(secret, endpointHost, key) }
-                if save { record(SavedConnection(kind: .s3, host: hostName, port: hostPort, user: key, region: area), replacing: savedID) }
-                showConnectSheet = false
-                didConnect(server, top)
-            } catch let error as RemoteError {
-                connectError = error.message
-            } catch {
-                connectError = "Unable to reach the server."
-            }
+        let valid: ConnectionForm.Valid
+        switch form.validated(store: secrets) {
+        case .success(let checked): valid = checked
+        case .failure(let error): connectError = error.message; return
         }
-    }
-
-    /// Connect to SFTP: sign in, and start in the folder the server starts in. A server not seen before
-    /// asks "Trust this server?" first. A changed key stops with a warning.
-    func connectSFTP(host rawHost: String, port rawPort: String, user rawUser: String, useKey: Bool, keyPath: String, secret: String, remember: Bool,
-                     save: Bool = false, savedID: UUID? = nil) {
-        guard !isConnecting else { return }
-        let host = rawHost.trimmingCharacters(in: .whitespaces)
-        let user = rawUser.trimmingCharacters(in: .whitespaces)
-        guard !host.isEmpty else { connectError = "Type the server name, like nas.local."; return }
-        var port: Int?
-        if !rawPort.trimmingCharacters(in: .whitespaces).isEmpty {
-            guard let number = Int(rawPort.trimmingCharacters(in: .whitespaces)), (1...65535).contains(number) else {
-                connectError = "The port is a number from 1 to 65535."; return
-            }
-            port = number
-        }
-        guard !user.isEmpty else { connectError = "Type the user name."; return }
-        guard !useKey || !keyPath.isEmpty else { connectError = "Choose a key file."; return }
-        let secretText = secret.isEmpty ? savedSSHSecret(host, user) ?? "" : secret
-        guard useKey || !secretText.isEmpty else { connectError = "Type the password."; return }
         connectError = nil
         pendingTrust = nil
-        let login: SFTPFileSystem.Login = useKey ? .key(path: keyPath, passphrase: secretText) : .password(secretText)
-        let server = makeSFTP(host, port, user, login)
+        let connection = valid.connection
+        let server = makeServer(valid)
         isConnecting = true
         let attempt: () -> Void = { [unowned self] in
             Task {
                 defer { isConnecting = false; afterAttempt?() }
                 do {
                     let start = try await server.start()
-                    if remember, !secretText.isEmpty { saveSSHSecret(secretText, host, user) }
-                    if save { record(SavedConnection(kind: .sftp, host: host, port: port, user: user, useKey: useKey, keyPath: useKey ? keyPath : nil), replacing: savedID) }
+                    if remember, !valid.secret.isEmpty { secrets.save(valid.secret, for: connection) }
+                    if save { record(connection, replacing: savedID) }
                     showConnectSheet = false
-                    didConnect(server, RemoteURL.make(scheme: "sftp", host: host, port: port, path: start))
+                    didConnect(server, RemoteURL.make(scheme: connection.scheme, host: connection.host, port: connection.port, path: start))
                 } catch RemoteError.unknownHostKey(let fingerprint, let keyLine) {
-                    pendingTrust = PendingTrust(host: host, fingerprint: fingerprint, keyLine: keyLine)
+                    pendingTrust = PendingTrust(host: connection.host, fingerprint: fingerprint, keyLine: keyLine)
                     trustServer = server
                 } catch let error as RemoteError {
                     connectError = error.message
@@ -234,9 +180,29 @@ final class Connections {
         attempt()
     }
 
+    func connectS3(accessKey: String, secretKey: String, region: String, endpoint: String, remember: Bool, save: Bool = false, savedID: UUID? = nil) {
+        var form = ConnectionForm(kind: .s3)
+        form.user = accessKey; form.secret = secretKey; form.region = region; form.endpoint = endpoint
+        connect(form, remember: remember, save: save, savedID: savedID)
+    }
+
+    func connectSFTP(host: String, port: String, user: String, useKey: Bool, keyPath: String, secret: String, remember: Bool,
+                     save: Bool = false, savedID: UUID? = nil) {
+        var form = ConnectionForm(kind: .sftp)
+        form.host = host; form.port = port; form.user = user; form.useKey = useKey; form.keyPath = keyPath; form.secret = secret
+        connect(form, remember: remember, save: save, savedID: savedID)
+    }
+
+    func connectFTP(host: String, port: String, user: String, password: String, protocol choice: FTPProtocol, remember: Bool,
+                    save: Bool = false, savedID: UUID? = nil) {
+        var form = ConnectionForm(kind: choice == .tls ? .ftps : .ftp)
+        form.host = host; form.port = port; form.user = user; form.secret = password
+        connect(form, remember: remember, save: save, savedID: savedID)
+    }
+
     /// Trust this server: remember its key, then connect again.
     func trustPendingServer() {
-        guard let pending = pendingTrust, let server = trustServer else { return }
+        guard let pending = pendingTrust, let server = trustServer as? SFTPFileSystem else { return }
         do { try server.trust(keyLine: pending.keyLine) } catch { connectError = "Unable to remember this server."; return }
         pendingTrust = nil
         resumeAfterTrust?()
@@ -246,42 +212,5 @@ final class Connections {
         pendingTrust = nil
         trustServer = nil
         resumeAfterTrust = nil
-    }
-
-    /// Connect to FTP: sign in, then show the server's top folder.
-    func connectFTP(host rawHost: String, port rawPort: String, user rawUser: String, password: String, protocol choice: FTPProtocol, remember: Bool,
-                    save: Bool = false, savedID: UUID? = nil) {
-        guard !isConnecting else { return }
-        let host = rawHost.trimmingCharacters(in: .whitespaces)
-        let user = rawUser.trimmingCharacters(in: .whitespaces)
-        guard !host.isEmpty else { connectError = "Type the server name, like ftp.example.com."; return }
-        var port: Int?
-        if !rawPort.trimmingCharacters(in: .whitespaces).isEmpty {
-            guard let number = Int(rawPort.trimmingCharacters(in: .whitespaces)), (1...65535).contains(number) else {
-                connectError = "The port is a number from 1 to 65535."; return
-            }
-            port = number
-        }
-        guard !user.isEmpty else { connectError = "Type the user name."; return }
-        let secure = choice == .tls
-        let secret = password.isEmpty ? savedFTPSecret(host, user, secure) ?? "" : password
-        guard !secret.isEmpty else { connectError = "Type the password."; return }
-        connectError = nil
-        isConnecting = true
-        let server = makeFTP(host, port, user, secret, secure)
-        Task {
-            defer { isConnecting = false; afterAttempt?() }
-            do {
-                let start = try await server.start()
-                if remember { saveFTPSecret(secret, host, user, secure) }
-                if save { record(SavedConnection(kind: secure ? .ftps : .ftp, host: host, port: port, user: user), replacing: savedID) }
-                showConnectSheet = false
-                didConnect(server, RemoteURL.make(scheme: secure ? "ftps" : "ftp", host: host, port: port, path: start))
-            } catch let error as RemoteError {
-                connectError = error.message
-            } catch {
-                connectError = "Unable to reach the server."
-            }
-        }
     }
 }
