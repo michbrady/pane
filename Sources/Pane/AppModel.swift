@@ -45,7 +45,8 @@ final class AppModel {
 
     let places = Places()
     /// The open connections to servers, shared by every tab.
-    let router = FileSystemRouter()
+    let router = FileSystemRouter(local: LocalFileSystem(
+        trashFolder: Locations.isOverridden ? Locations.home.appending(path: ".Trash", directoryHint: .isDirectory) : nil))
 
     // Address bar
     var isEditingAddress = false
@@ -117,6 +118,7 @@ final class AppModel {
         let tab = FolderTab(start: start, view: view)
         tab.spotlight = Locations.isOverridden ? nil : SystemSpotlight()
         tab.router = router
+        actions.router = router
         tab.requestRemoteOpen = { [unowned self] _ in actions.alertMessage = "Opening a file on a server comes in a later step. For now, browse it." }
         tab.requestDownload = { [unowned self] url in actions.downloadAndOpen(url) }
         tab.didNavigate = { [unowned self, unowned tab] in

@@ -112,8 +112,13 @@ struct OperationSheet: View {
         VStack(alignment: .leading, spacing: Space.md) {
             Text(title).font(.headline)
             if let p = model.actions.progress {
-                ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
+                // A copy to or from a server counts bytes. A local copy counts items.
+                ProgressView(value: p.bytesTotal > 0 ? Double(p.bytesDone) : Double(p.done),
+                             total: p.bytesTotal > 0 ? Double(p.bytesTotal) : Double(max(p.total, 1)))
                 Text(p.current).font(.callout).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                if !model.actions.progressDetail.isEmpty {
+                    Text(model.actions.progressDetail).font(.callout).foregroundStyle(.secondary).monospacedDigit()
+                }
             } else {
                 ProgressView().progressViewStyle(.linear)
             }

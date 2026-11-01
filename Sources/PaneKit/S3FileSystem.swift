@@ -3,6 +3,32 @@ import Foundation
 /// Sends one signed request. The real one is URLSession. Tests give a stub.
 public protocol S3Transport: Sendable {
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
+    /// Sends a file as the request's body, without loading it into memory.
+    func upload(_ request: URLRequest, fromFile: URL, progress: @escaping ByteProgress) async throws -> (Data, HTTPURLResponse)
+    /// Saves the answer's body to `file`, without loading it into memory.
+    func download(_ request: URLRequest, to file: URL, progress: @escaping ByteProgress) async throws -> HTTPURLResponse
+}
+
+public extension S3Transport {
+    func upload(_ request: URLRequest, fromFile: URL, progress: @escaping ByteProgress) async throws -> (Data, HTTPURLResponse) {
+        throw RemoteError.other("not supported")
+    }
+    func download(_ request: URLRequest, to file: URL, progress: @escaping ByteProgress) async throws -> HTTPURLResponse {
+        throw RemoteError.other("not supported")
+    }
+}
+
+/// Reports how far a transfer has got.
+private final class ProgressDelegate: NSObject, URLSessionTaskDelegate, URLSessionDownloadDelegate, @unchecked Sendable {
+    let progress: ByteProgress
+    init(_ progress: @escaping ByteProgress) { self.progress = progress }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        progress(totalBytesSent)
+    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        progress(totalBytesWritten)
+    }
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
 }
 
 public struct URLSessionTransport: S3Transport {
@@ -12,6 +38,32 @@ public struct URLSessionTransport: S3Transport {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw RemoteError.connectionLost }
             return (data, http)
+        } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost, .cannotFindHost].contains(error.code) {
+            throw RemoteError.connectionLost
+        }
+    }
+
+    public func upload(_ request: URLRequest, fromFile: URL, progress: @escaping ByteProgress) async throws -> (Data, HTTPURLResponse) {
+        do {
+            let (data, response) = try await URLSession.shared.upload(for: request, fromFile: fromFile, delegate: ProgressDelegate(progress))
+            guard let http = response as? HTTPURLResponse else { throw RemoteError.connectionLost }
+            return (data, http)
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost, .cannotFindHost].contains(error.code) {
+            throw RemoteError.connectionLost
+        }
+    }
+
+    public func download(_ request: URLRequest, to file: URL, progress: @escaping ByteProgress) async throws -> HTTPURLResponse {
+        do {
+            let (temporary, response) = try await URLSession.shared.download(for: request, delegate: ProgressDelegate(progress))
+            guard let http = response as? HTTPURLResponse else { throw RemoteError.connectionLost }
+            try? FileManager.default.removeItem(at: file)
+            try FileManager.default.moveItem(at: temporary, to: file)
+            return http
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost, .cannotFindHost].contains(error.code) {
             throw RemoteError.connectionLost
         }
@@ -84,8 +136,45 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
-    public func remove(_ url: URL) async throws { throw RemoteError.other("not supported") }
-    public func makeFolder(_ url: URL) async throws { throw RemoteError.other("not supported") }
+
+    /// A folder is a key ending in "/". Buckets are made in the S3 console, not here.
+    public func makeFolder(_ url: URL) async throws {
+        let pieces = RemoteURL.pathComponents(RemoteURL.canonical(url))
+        guard pieces.count >= 2 else { throw RemoteError.other("Create buckets in the S3 console. Pane can make folders inside one.") }
+        _ = try await send("PUT", path: "/" + pieces.joined(separator: "/") + "/")
+    }
+
+    /// Deletes a file, or a folder and everything under it. Deleting a key that is not there is not an error in S3.
+    public func remove(_ url: URL) async throws {
+        let pieces = RemoteURL.pathComponents(RemoteURL.canonical(url))
+        guard pieces.count >= 2 else { throw RemoteError.other("Pane does not delete buckets. Do that in the S3 console.") }
+        for child in try await list(url) { try await remove(child.url) }
+        let key = "/" + pieces.joined(separator: "/")
+        _ = try await send("DELETE", path: key)
+        _ = try await send("DELETE", path: key + "/")
+    }
+
+    public func download(_ remote: URL, to local: URL, progress: @escaping ByteProgress) async throws {
+        let pieces = RemoteURL.pathComponents(RemoteURL.canonical(remote))
+        guard pieces.count >= 2 else { throw RemoteError.other("That is not a file.") }
+        let request = try signedRequest("GET", path: "/" + pieces.joined(separator: "/"), query: [], payloadHash: nil)
+        let response = try await transport.download(request, to: local, progress: progress)
+        guard (200..<300).contains(response.statusCode) else {
+            try? FileManager.default.removeItem(at: local)
+            throw Self.error(status: response.statusCode, body: Data())
+        }
+    }
+
+    /// One PUT sends the whole file, and S3 shows the key only when it all arrived. A cancel leaves nothing.
+    public func upload(_ local: URL, to remote: URL, replacing: Bool, progress: @escaping ByteProgress) async throws {
+        let pieces = RemoteURL.pathComponents(RemoteURL.canonical(remote))
+        guard pieces.count >= 2 else { throw RemoteError.other("Open a bucket first. Files go inside a bucket.") }
+        let size = (try FileManager.default.attributesOfItem(atPath: local.path)[.size] as? Int64) ?? 0
+        guard size <= 5_000_000_000 else { throw RemoteError.other("Files over 5 GB cannot be uploaded to S3 yet.") }
+        let request = try signedRequest("PUT", path: "/" + pieces.joined(separator: "/"), query: [], payloadHash: "UNSIGNED-PAYLOAD")
+        let (data, response) = try await transport.upload(request, fromFile: local, progress: progress)
+        guard (200..<300).contains(response.statusCode) else { throw Self.error(status: response.statusCode, body: data) }
+    }
 
     // MARK: Requests
 
@@ -108,33 +197,41 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
         return page
     }
 
-    /// Path-style addressing (`host/bucket/key`) works for AWS and for MinIO, R2, and the rest.
     private func get(path: String, query: [URLQueryItem]) async throws -> Data {
+        try await send("GET", path: path, query: query)
+    }
+
+    private func send(_ method: String, path: String, query: [URLQueryItem] = []) async throws -> Data {
+        let request = try signedRequest(method, path: path, query: query, payloadHash: nil)
+        let (data, response) = try await transport.send(request)
+        guard (200..<300).contains(response.statusCode) else { throw Self.error(status: response.statusCode, body: data) }
+        return data
+    }
+
+    /// Path-style addressing (`host/bucket/key`) works for AWS and for MinIO, R2, and the rest.
+    private func signedRequest(_ method: String, path: String, query: [URLQueryItem], payloadHash: String?) throws -> URLRequest {
         var parts = URLComponents()
         parts.scheme = secure ? "https" : "http"
         parts.host = host
         parts.port = port
         parts.percentEncodedPath = path.split(separator: "/", omittingEmptySubsequences: false)
             .map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/")
-        parts.queryItems = query.isEmpty ? nil : query
         // URLComponents leaves "+" and "&" in values; S3 wants them encoded.
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
-        if let items = parts.queryItems {
-            parts.percentEncodedQueryItems = items.map {
+        if !query.isEmpty {
+            parts.percentEncodedQueryItems = query.map {
                 URLQueryItem(name: $0.name.addingPercentEncoding(withAllowedCharacters: allowed) ?? $0.name,
                              value: $0.value?.addingPercentEncoding(withAllowedCharacters: allowed))
             }
         }
         guard let url = parts.url else { throw RemoteError.other("Unable to build that address.") }
         var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 30
-        for (name, value) in S3Signer.sign(method: "GET", url: url, credentials: credentials, region: region, date: now()) {
+        request.httpMethod = method
+        request.timeoutInterval = payloadHash == nil && method == "GET" ? 30 : 600
+        for (name, value) in S3Signer.sign(method: method, url: url, credentials: credentials, region: region, date: now(), payloadHash: payloadHash) {
             request.setValue(value, forHTTPHeaderField: name)
         }
-        let (data, response) = try await transport.send(request)
-        guard (200..<300).contains(response.statusCode) else { throw Self.error(status: response.statusCode, body: data) }
-        return data
+        return request
     }
 
     static func error(status: Int, body: Data) -> RemoteError {

@@ -524,7 +524,8 @@ Acceptance:
 - [self] A conflict opens the same Replace, Skip, Decide sheet as local copies (S-012).
 - [self] Cut from a remote place deletes the source only after the copy succeeds.
 - [manual] A 1 GB file moves without freezing the window.
-Status: todo
+Note: Copy, Cut, Paste, and drag work between this Mac and a server both ways, and server to server (through a temporary file). Folders go with everything inside. A file shows under its name only when whole: SFTP and FTP send to a hidden name and rename it, S3 shows a key only when the PUT finishes, and a download goes to a hidden part file first. Cancel stops the `sftp` or `curl` process and removes the part. Cut removes the original only after its copy succeeded (this Mac's originals go to the Trash). Tested against a server in memory with real bytes, and the exact commands each protocol sends. Limits to know: there is no Undo for these, since a server has no Trash. SFTP and FTP report progress for downloads but only at the end for uploads, because `sftp` and `curl` do not report it from a script. A server's hidden files (names starting with ".") are not listed, so a folder copied from a server leaves them behind. S3 stops at 5 GB per file (multipart is later). [manual] A 1 GB file on a real server, to see the window stay responsive: the work runs off the main thread and streams from disk, but that is not measured yet.
+Status: done
 
 ### S-065 Change files on a remote place
 As the user, I rename, delete, and make folders on a remote place.

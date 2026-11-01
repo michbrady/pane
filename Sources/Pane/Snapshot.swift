@@ -13,7 +13,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, transfer, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -168,6 +168,9 @@ enum Snapshot {
             case .progress:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.actions.showProgressForSnapshot()
+            case .transfer:
+                model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
+                model.actions.showTransferProgressForSnapshot()
             }
         }
     }

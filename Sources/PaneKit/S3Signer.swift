@@ -40,10 +40,12 @@ public enum S3Signer {
     /// The headers to add: `x-amz-date`, `x-amz-content-sha256`, and `Authorization`.
     /// `headers` are the ones the caller sets itself (like Range). They are signed too.
     public static func sign(method: String, url: URL, headers: [String: String] = [:], payload: Data = Data(),
-                            credentials: Credentials, region: String, date: Date, service: String = "s3") -> [String: String] {
+                            credentials: Credentials, region: String, date: Date, service: String = "s3",
+                            payloadHash fixedHash: String? = nil) -> [String: String] {
         let amzDate = stamp(date)
         let day = String(amzDate.prefix(8))
-        let payloadHash = sha256(payload)
+        // A file sent from disk is not read twice just to hash it: the caller passes "UNSIGNED-PAYLOAD".
+        let payloadHash = fixedHash ?? sha256(payload)
 
         var signed = headers.reduce(into: [String: String]()) { $0[$1.key.lowercased()] = $1.value.trimmingCharacters(in: .whitespaces) }
         let port = url.port.map { ":\($0)" } ?? ""

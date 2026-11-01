@@ -32,6 +32,12 @@ final class FileActions {
     /// The running copy or move. A sheet shows it once it takes more than a second.
     private(set) var progress: OperationProgress?
     private(set) var progressTitle = ""
+    /// "12 MB of 40 MB · 3.2 MB/s · 9 seconds left", for a copy to or from a server.
+    private(set) var progressDetail = ""
+    private var stats = TransferStats()
+    /// The servers that are connected. AppModel sets it, so a paste can reach them.
+    var router = FileSystemRouter()
+    private var transfers: TransferOperations { TransferOperations(router: router) }
     private(set) var progressVisible = false
     private var operationTask: Task<Void, Never>?
     /// Rename, New Folder, Undo, and Redo run in the background without `operationTask`.
@@ -88,7 +94,6 @@ final class FileActions {
     }
 
     func paste() {
-        if blockedOnServer() { return }
         if let text = editingText { text.paste(nil); return }
         let sources = clipboard.urls
         guard !sources.isEmpty, operationTask == nil else { return }
@@ -96,12 +101,19 @@ final class FileActions {
     }
 
     private func startPaste(_ sources: [URL], into folder: URL, mode: PasteMode, clearsCut: Bool) {
-        // A server address must never reach the local file calls, in either direction.
+        guard !sources.isEmpty, operationTask == nil else { return }
+        // A server address must never reach the local file calls. Anything that touches a server goes the other way.
         if sources.contains(where: RemoteURL.isRemote) || RemoteURL.isRemote(folder) {
-            alertMessage = "Copying to and from a server comes in a later step. For now, you can browse it."
+            run(title: mode == .copy ? "Copying" : "Moving") { [self] in
+                await transfers.paste(sources, into: folder, mode: mode,
+                                      resolve: { [self] conflict in await askConflict(conflict) },
+                                      progress: { p in Task { @MainActor in self.noteProgress(p) } })
+            } finished: { [self] result in
+                if clearsCut { clipboard.clearCut() }
+                return result
+            }
             return
         }
-        guard !sources.isEmpty, operationTask == nil else { return }
         run(title: mode == .copy ? "Copying" : "Moving") { [self] in
             await operations.paste(sources, into: folder, mode: mode,
                                    resolve: { [self] conflict in await askConflict(conflict) },
@@ -143,6 +155,8 @@ final class FileActions {
                      finished: @escaping (OperationResult) -> OperationResult) {
         progressTitle = title
         progress = nil
+        progressDetail = ""
+        stats = TransferStats()
         progressVisible = false
         operationTask = Task {
             let reveal = Task {
@@ -164,8 +178,8 @@ final class FileActions {
         await withCheckedContinuation { continuation in
             pendingConflict = PendingConflict(
                 conflict: conflict,
-                incoming: FolderLister.item(at: conflict.source),
-                existing: FolderLister.item(at: conflict.existing),
+                incoming: conflict.incomingItem ?? FolderLister.item(at: conflict.source),
+                existing: conflict.existingItem ?? FolderLister.item(at: conflict.existing),
                 continuation: continuation)
         }
     }
@@ -239,8 +253,17 @@ final class FileActions {
         progressVisible = true
     }
 
+    /// A copy to a server, part of the way: bytes, speed, and time left.
+    func showTransferProgressForSnapshot() {
+        progressTitle = "Copying"
+        progress = OperationProgress(done: 0, total: 1, current: "Trip video.mov", bytesDone: 412_000_000, bytesTotal: 1_180_000_000)
+        progressDetail = "412 MB of 1.2 GB · 8.4 MB/s · 2 minutes left"
+        progressVisible = true
+    }
+
     func hideProgressForSnapshot() {
         progressVisible = false
+        progressDetail = ""
         progress = nil
     }
 
@@ -358,6 +381,13 @@ final class FileActions {
             do { box.record = try await operations.redo(box.record) } catch { alertMessage = "Unable to redo. \(error.localizedDescription)" }
             tab.reload()
         }
+    }
+
+    private func noteProgress(_ p: OperationProgress) {
+        progress = p
+        guard p.bytesTotal > 0 else { return }
+        stats.add(bytes: p.bytesDone, at: Date())
+        progressDetail = stats.describe(done: p.bytesDone, total: p.bytesTotal)
     }
 
     func cancelOperation() {

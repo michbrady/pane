@@ -6,9 +6,11 @@ import UniformTypeIdentifiers
 struct FileDropDelegate: DropDelegate {
     let model: AppModel
     let folder: URL
+    /// A file from this Mac is a file URL. An item on a server is a plain URL.
+    static let types: [UTType] = [.fileURL, .url]
 
     func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [.fileURL])
+        info.hasItemsConforming(to: Self.types)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
@@ -16,7 +18,7 @@ struct FileDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        let providers = info.itemProviders(for: [.fileURL])
+        let providers = info.itemProviders(for: Self.types)
         guard !providers.isEmpty else { return false }
         // Read the keys now: loading the files takes a moment, and Option may be let go by then.
         let keys = NSEvent.modifierFlags
@@ -43,6 +45,6 @@ extension NSItemProvider {
 extension View {
     /// Makes a folder row accept dropped files.
     func acceptsFileDrops(into folder: URL, model: AppModel) -> some View {
-        onDrop(of: [.fileURL], delegate: FileDropDelegate(model: model, folder: folder))
+        onDrop(of: FileDropDelegate.types, delegate: FileDropDelegate(model: model, folder: folder))
     }
 }

@@ -81,9 +81,6 @@ extension SelfTest {
         model.actions.newFolder()
         check("so is New Folder", model.actions.alertMessage?.contains("later step") == true)
         model.actions.alertMessage = nil
-        model.actions.drop([c.docs.appending(path: "Notes.txt")], into: top, option: false, command: false)
-        check("so is dropping a local file onto a server", model.actions.alertMessage?.contains("later step") == true)
-        model.actions.alertMessage = nil
         check("no local file was touched by any of that", FileManager.default.fileExists(atPath: c.docs.appending(path: "Notes.txt").path))
 
         model.disconnect(serverKey: "sftp://nas")
@@ -205,6 +202,105 @@ extension SelfTest {
               "\(model.router.serverKeys) \(model.tab.items.map(\.name))")
         check("Remember saves the password under the server and user", ftpLog.saved == ["ftps://ftp.example.com/me"], "\(ftpLog.saved)")
         model.disconnect(serverKey: "ftps://ftp.example.com:2121")
+        await settle()
+
+        // S-064 Copy between this Mac and a server (a server in memory, with real bytes)
+        let box = InMemoryRemote(serverKey: "sftp://xfer")
+        let payload = Data((0..<4000).map { UInt8($0 % 241) })
+        box.add(folder: "/Inbox"); box.add(folder: "/Outbox"); box.add(file: "/Inbox/report.pdf", contents: payload)
+        model.connected(box)
+        let mine = c.home.appending(path: "Transfers", directoryHint: .isDirectory)
+        try? FileManager.default.removeItem(at: mine)
+        try? FileManager.default.createDirectory(at: mine, withIntermediateDirectories: true)
+        let photo = mine.appending(path: "photo.jpg")
+        try? payload.write(to: photo)
+        @MainActor func idle() async { await Wait.until { !model.actions.isBusy }; await settle() }
+        @MainActor func place(_ path: String) -> URL { RemoteURL.make(scheme: "sftp", host: "xfer", path: path) }
+
+        // this Mac to a server, through Copy and Paste
+        model.tab.go(to: mine); await settle()
+        model.tab.selection = [photo]
+        model.actions.copySelection()
+        model.tab.go(to: place("/Outbox")); await settle()
+        check("Paste lights up for files from this Mac in a server's folder", model.actions.canPaste)
+        model.actions.paste()
+        await idle()
+        check("a file pasted into a server arrives and matches byte for byte", box.data(at: "/Outbox/photo.jpg") == payload)
+        check("the server's folder lists it", model.tab.items.map(\.name) == ["photo.jpg"], "\(model.tab.items.map(\.name))")
+        check("the original stays after a copy", FileManager.default.fileExists(atPath: photo.path))
+
+        // the same name again asks the same question
+        model.tab.selection = []
+        model.tab.go(to: mine); await settle()
+        model.tab.selection = [photo]
+        model.actions.copySelection()
+        model.tab.go(to: place("/Outbox")); await settle()
+        model.actions.paste()
+        await Wait.until { model.actions.pendingConflict != nil }
+        check("a name already on the server opens the Replace, Skip, Keep Both sheet with the server's file shown",
+              model.actions.pendingConflict?.existing?.size == 4000 && model.actions.pendingConflict?.conflict.existing.path == "/Outbox/photo.jpg")
+        model.actions.resolveConflict(.keepBoth, applyToAll: false)
+        await idle()
+        check("Keep Both adds a numbered copy beside it", Set(box.paths()).isSuperset(of: ["/Outbox/photo.jpg", "/Outbox/photo (2).jpg"]), "\(box.paths())")
+
+        // a server to this Mac, through a drop
+        let inbox = mine.appending(path: "Inbox", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        model.actions.drop([place("/Inbox/report.pdf")], into: inbox, option: false, command: false)
+        await idle()
+        check("a file dropped from a server arrives and matches byte for byte", (try? Data(contentsOf: inbox.appending(path: "report.pdf"))) == payload)
+        check("no part file is left beside it", ((try? FileManager.default.contentsOfDirectory(atPath: inbox.path)) ?? []) == ["report.pdf"])
+        check("a server's folder is never pinned to Quick access", { model.places.pin(place("/Inbox")); return !model.places.quickRoots.contains { $0.url.scheme == "sftp" } }())
+
+        // Cut from a server removes the original only after the copy
+        model.tab.go(to: place("/Inbox")); await settle()
+        model.tab.selection = [place("/Inbox/report.pdf")]
+        model.actions.cutSelection()
+        check("an item cut on a server shows as cut", model.actions.isCut(place("/Inbox/report.pdf")))
+        let desk = mine.appending(path: "Moved", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: desk, withIntermediateDirectories: true)
+        model.tab.go(to: desk); await settle()
+        model.actions.paste()
+        await idle()
+        check("Cut then Paste moves it here and removes it from the server",
+              (try? Data(contentsOf: desk.appending(path: "report.pdf"))) == payload && box.data(at: "/Inbox/report.pdf") == nil)
+
+        // a failed copy keeps its original, and a failed Cut keeps it too
+        box.add(file: "/Inbox/flaky.bin", contents: Data(repeating: 3, count: 3000))
+        box.failTransfers(of: ["/Inbox/flaky.bin"])
+        model.actions.drop([place("/Inbox/flaky.bin")], into: desk, option: false, command: true)
+        await idle()
+        check("a copy that fails midway leaves no half file and keeps the original on the server",
+              box.data(at: "/Inbox/flaky.bin") != nil && !FileManager.default.fileExists(atPath: desk.appending(path: "flaky.bin").path)
+              && ((try? FileManager.default.contentsOfDirectory(atPath: desk.path)) ?? []).sorted() == ["report.pdf"],
+              "\(String(describing: try? FileManager.default.contentsOfDirectory(atPath: desk.path)))")
+        check("and says what went wrong", model.actions.alertMessage?.contains("Unable to reach the server") == true, model.actions.alertMessage ?? "nil")
+        model.actions.alertMessage = nil
+        box.failTransfers(of: [])
+
+        // a long copy shows the file, bytes, speed and time left, and Cancel stops it with nothing left behind
+        box.add(file: "/Inbox/big.bin", contents: Data(repeating: 5, count: 60_000))
+        box.slowTransfers(by: .milliseconds(25))
+        model.actions.drop([place("/Inbox/big.bin")], into: desk, option: true, command: false)
+        await Wait.until(5) { model.actions.progress?.bytesDone ?? 0 > 4_000 }
+        check("a long copy reports the file and its bytes", model.actions.progress?.current == "big.bin" && (model.actions.progress?.bytesTotal ?? 0) == 60_000,
+              "\(String(describing: model.actions.progress))")
+        await Wait.until(5) { model.actions.progressDetail.contains("/s") }
+        check("and the speed and time left", model.actions.progressDetail.contains(" of ") && model.actions.progressDetail.contains("/s") && model.actions.progressDetail.contains("left"),
+              model.actions.progressDetail)
+        model.actions.cancelOperation()
+        await idle()
+        check("Cancel stops it and leaves no half file", !FileManager.default.fileExists(atPath: desk.appending(path: "big.bin").path)
+              && ((try? FileManager.default.contentsOfDirectory(atPath: desk.path)) ?? []).sorted() == ["report.pdf"])
+        box.slowTransfers(by: .zero)
+
+        // changing files on a server is still S-065
+        model.tab.go(to: place("/Inbox")); await settle()
+        model.actions.newFolder()
+        check("New Folder on a server still waits for its own step", model.actions.alertMessage?.contains("later step") == true)
+        model.actions.alertMessage = nil
+
+        model.disconnect(serverKey: "sftp://xfer")
         await settle()
         model.tab.go(to: c.docs)
         await settle()

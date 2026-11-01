@@ -93,8 +93,59 @@ public final class FTPFileSystem: RemoteFileSystem, @unchecked Sendable {
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
-    public func remove(_ url: URL) async throws { throw RemoteError.other("not supported") }
-    public func makeFolder(_ url: URL) async throws { throw RemoteError.other("not supported") }
+
+    public func makeFolder(_ url: URL) async throws {
+        try await inFolder(of: url, command: "MKD \(RemoteURL.name(of: url))")
+    }
+
+    /// A file, or a folder with everything in it (FTP only removes empty folders, so it is emptied first).
+    public func remove(_ url: URL) async throws {
+        try await RemoteTree.remove(url, in: self,
+                                    file: { try await self.inFolder(of: $0, command: "DELE \(RemoteURL.name(of: $0))") },
+                                    emptyFolder: { try await self.inFolder(of: $0, command: "RMD \(RemoteURL.name(of: $0))") })
+    }
+
+    public func download(_ remote: URL, to local: URL, progress: @escaping ByteProgress) async throws {
+        let watcher = FileGrowth.watch(local, progress: progress)
+        defer { watcher.cancel() }
+        _ = try await curl(address(of: remote, folder: false), extra: ["output = \(FTPText.configQuote(local.path))"], seconds: 0)
+    }
+
+    /// Sends to a hidden name, then renames it into place, so the real name only ever holds a whole file.
+    /// A failure or a cancel removes the hidden file. curl does not report progress here, so it shows at the end.
+    public func upload(_ local: URL, to remote: URL, replacing: Bool, progress: @escaping ByteProgress) async throws {
+        let name = RemoteURL.name(of: remote)
+        let part = ".\(name).pane-part-\(UUID().uuidString)"
+        let folder = RemoteURL.parent(of: remote) ?? remote
+        var extra = ["upload-file = \(FTPText.configQuote(local.path))"]
+        // "-" runs a command after the transfer. A "*" lets it fail without stopping the rest.
+        if replacing { extra.append("quote = \(FTPText.configQuote("-*DELE \(name)"))") }
+        extra.append("quote = \(FTPText.configQuote("-RNFR \(part)"))")
+        extra.append("quote = \(FTPText.configQuote("-RNTO \(name)"))")
+        do {
+            _ = try await curl(address(of: folder, folder: true) + part, extra: extra, seconds: 0)
+        } catch {
+            await Task.detached { try? await self.inFolder(of: folder.appending(path: part), command: "*DELE \(part)") }.value
+            throw error
+        }
+        progress((try? FileManager.default.attributesOfItem(atPath: local.path)[.size] as? Int64) ?? 0)
+    }
+
+    /// Runs one FTP command in the folder that holds `url`, by listing that folder and sending it afterwards.
+    private func inFolder(of url: URL, command: String) async throws {
+        let folder = RemoteURL.parent(of: url) ?? url
+        _ = try await curl(address(of: folder, folder: true), extra: ["quote = \(FTPText.configQuote("-" + command))"])
+    }
+
+    private func address(of url: URL, folder: Bool) -> String {
+        var parts = URLComponents()
+        parts.scheme = scheme
+        parts.host = host
+        parts.port = port
+        let path = RemoteURL.canonical(url).path
+        parts.path = folder && !path.hasSuffix("/") ? path + "/" : path
+        return parts.string ?? ""
+    }
 
     /// The address and the login go in on stdin as a curl config, so the password never shows in `ps`.
     private func fetch(_ path: String) async throws -> String {
@@ -104,10 +155,15 @@ public final class FTPFileSystem: RemoteFileSystem, @unchecked Sendable {
         parts.port = port
         parts.path = path.hasSuffix("/") ? path : path + "/"   // a trailing slash asks for the folder's listing
         guard let address = parts.string else { throw RemoteError.other("Unable to build that address.") }
-        let config = "url = \(FTPText.configQuote(address))\nuser = \(FTPText.configQuote(user + ":" + password))\n"
-        var arguments = ["--silent", "--show-error", "--connect-timeout", "15", "--max-time", "60", "--config", "-"]
+        return try await curl(address, extra: [])
+    }
+
+    /// `seconds` limits a quick request. A transfer passes 0, because a big file takes as long as it takes.
+    private func curl(_ address: String, extra: [String], seconds: Int = 60) async throws -> String {
+        let lines = ["url = \(FTPText.configQuote(address))", "user = \(FTPText.configQuote(user + ":" + password))"] + extra
+        var arguments = ["--silent", "--show-error", "--connect-timeout", "15", "--max-time", String(seconds), "--config", "-"]
         if scheme == "ftps" { arguments.append("--ssl-reqd") }
-        let result = try await runner.run("/usr/bin/curl", arguments, input: config, environment: [:])
+        let result = try await runner.run("/usr/bin/curl", arguments, input: lines.joined(separator: "\n") + "\n", environment: [:])
         guard result.status == 0 else { throw FTPText.classify(status: result.status, stderr: result.stderr) }
         return result.stdout
     }

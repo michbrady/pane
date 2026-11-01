@@ -74,8 +74,45 @@ public final class SFTPFileSystem: RemoteFileSystem, @unchecked Sendable {
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
-    public func remove(_ url: URL) async throws { throw RemoteError.other("not supported") }
-    public func makeFolder(_ url: URL) async throws { throw RemoteError.other("not supported") }
+
+    public func makeFolder(_ url: URL) async throws {
+        _ = try await sftp("mkdir \(SFTPText.quote(path(url)))")
+    }
+
+    /// A file, or a folder with everything in it (`sftp` only removes empty folders, so it is emptied first).
+    public func remove(_ url: URL) async throws {
+        try await RemoteTree.remove(url, in: self,
+                                    file: { _ = try await self.sftp("rm \(SFTPText.quote(self.path($0)))") },
+                                    emptyFolder: { _ = try await self.sftp("rmdir \(SFTPText.quote(self.path($0)))") })
+    }
+
+    public func download(_ remote: URL, to local: URL, progress: @escaping ByteProgress) async throws {
+        let watcher = FileGrowth.watch(local, progress: progress)
+        defer { watcher.cancel() }
+        _ = try await sftp("get \(SFTPText.quote(path(remote))) \(SFTPText.quote(local.path))")
+    }
+
+    /// Sends to a hidden name, then renames it into place, so the real name only ever holds a whole file.
+    /// A failure or a cancel removes the hidden file. `sftp` does not report progress, so it shows at the end.
+    public func upload(_ local: URL, to remote: URL, replacing: Bool, progress: @escaping ByteProgress) async throws {
+        let final = path(remote)
+        let folder = path(RemoteURL.parent(of: remote) ?? remote)
+        let part = (folder == "/" ? "" : folder) + "/.\(RemoteURL.name(of: remote)).pane-part-\(UUID().uuidString)"
+        var commands = ["put \(SFTPText.quote(local.path)) \(SFTPText.quote(part))"]
+        // A leading "-" lets a command fail without stopping the rest.
+        if replacing { commands.append("-rm \(SFTPText.quote(final))") }
+        commands.append("rename \(SFTPText.quote(part)) \(SFTPText.quote(final))")
+        do {
+            _ = try await sftp(commands.joined(separator: "\n"))
+        } catch {
+            // A cancelled task cannot run more work, so the clean-up runs on its own.
+            await Task.detached { _ = try? await self.sftp("-rm \(SFTPText.quote(part))") }.value
+            throw error
+        }
+        progress((try? FileManager.default.attributesOfItem(atPath: local.path)[.size] as? Int64) ?? 0)
+    }
+
+    private func path(_ url: URL) -> String { RemoteURL.canonical(url).path }
 
     // MARK: Running sftp
 

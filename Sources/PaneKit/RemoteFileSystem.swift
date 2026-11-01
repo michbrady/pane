@@ -28,7 +28,15 @@ extension RemoteError {
 
 /// A file system on a server. FTP, SFTP, and S3 each provide one. It works on URLs like
 /// `sftp://host/folder`, so the rest of Pane treats it like any other place.
+public typealias ByteProgress = @Sendable (Int64) -> Void
+
 public protocol RemoteFileSystem: FileSystem {
+    /// Copies a file from the server to `local`, calling `progress` with the bytes so far.
+    /// Stops early, and throws, when the task is cancelled. The caller removes what was half written.
+    func download(_ remote: URL, to local: URL, progress: @escaping ByteProgress) async throws
+    /// Copies a file to the server. The file appears under its name only when it is whole, so a cancelled
+    /// or failed upload leaves nothing behind. `replacing` is true when a file is already there.
+    func upload(_ local: URL, to remote: URL, replacing: Bool, progress: @escaping ByteProgress) async throws
     /// `scheme://host:port`, the key the router files this connection under.
     var serverKey: String { get }
     /// Opens the connection again after it was lost.
@@ -78,6 +86,9 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
     private let lock = NSLock()
     private var lost = false
     private var listDelay: Duration = .zero
+    private var contents: [String: Data] = [:]
+    private var transferDelay: Duration = .zero
+    private var failing: Set<String> = []
 
     public init(serverKey: String) {
         self.serverKey = serverKey
@@ -89,6 +100,24 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
 
     /// Makes the next listings fail as if the connection dropped, until `reconnect()`.
     public func dropConnection() { lock.withLock { lost = true } }
+
+    /// A file with real bytes, so a download can be compared byte for byte.
+    public func add(file path: String, contents data: Data) {
+        inner.add(file: path, size: Int64(data.count))
+        lock.withLock { contents[path] = data }
+    }
+
+    /// The bytes of a file on the server, or nil.
+    public func data(at path: String) -> Data? { lock.withLock { contents[path] } }
+
+    /// Paths on the server that exist now, for tests.
+    public func paths() -> [String] { inner.paths().filter { !$0.hasPrefix("/.Trash") && $0 != "/" } }
+
+    /// Makes each 1 KB of a transfer take this long, so a test can cancel one midway.
+    public func slowTransfers(by delay: Duration) { lock.withLock { transferDelay = delay } }
+
+    /// Makes uploads and downloads of these server paths fail.
+    public func failTransfers(of paths: Set<String>) { lock.withLock { failing = paths } }
 
     /// Makes listings slow, so a test can see the loading state.
     public func slowDown(by delay: Duration) { lock.withLock { listDelay = delay } }
@@ -124,6 +153,58 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
-    public func remove(_ url: URL) async throws { throw RemoteError.other("not supported") }
-    public func makeFolder(_ url: URL) async throws { throw RemoteError.other("not supported") }
+
+    public func remove(_ url: URL) async throws {
+        guard !isLost else { throw RemoteError.connectionLost }
+        let path = RemoteURL.canonical(url).path
+        try await inner.remove(innerURL(url))
+        lock.withLock { for key in contents.keys where key == path || key.hasPrefix(path + "/") { contents[key] = nil } }
+    }
+
+    public func makeFolder(_ url: URL) async throws {
+        guard !isLost else { throw RemoteError.connectionLost }
+        try await inner.makeFolder(innerURL(url))
+    }
+
+    public func download(_ remote: URL, to local: URL, progress: @escaping ByteProgress) async throws {
+        guard !isLost else { throw RemoteError.connectionLost }
+        let path = RemoteURL.canonical(remote).path
+        let (data, delay, fails) = lock.withLock { (contents[path], transferDelay, failing.contains(path)) }
+        guard let data else { throw RemoteError.other("That file does not exist.") }
+        FileManager.default.createFile(atPath: local.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: local)
+        defer { try? handle.close() }
+        if fails {
+            // A server that drops partway: half the file arrives, then the connection is gone.
+            try handle.write(contentsOf: data.prefix(data.count / 2))
+            throw RemoteError.connectionLost
+        }
+        var sent = 0
+        while sent < data.count {
+            try Task.checkCancellation()
+            if delay != .zero { try await Task.sleep(for: delay) }
+            let end = min(sent + 1024, data.count)
+            try handle.write(contentsOf: data[sent..<end])
+            sent = end
+            progress(Int64(sent))
+        }
+    }
+
+    public func upload(_ local: URL, to remote: URL, replacing: Bool, progress: @escaping ByteProgress) async throws {
+        guard !isLost else { throw RemoteError.connectionLost }
+        let path = RemoteURL.canonical(remote).path
+        let (delay, fails) = lock.withLock { (transferDelay, failing.contains(path)) }
+        let data = try Data(contentsOf: local)
+        if fails { throw RemoteError.connectionLost }
+        var received = 0
+        while received < data.count {
+            try Task.checkCancellation()
+            if delay != .zero { try await Task.sleep(for: delay) }
+            received = min(received + 1024, data.count)
+            progress(Int64(received))
+        }
+        // Only a whole file appears. A cancelled upload never reaches this line.
+        if replacing { try? await inner.remove(innerURL(remote)) }
+        add(file: path, contents: data)
+    }
 }

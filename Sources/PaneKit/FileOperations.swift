@@ -7,11 +7,16 @@ public struct Conflict: Sendable {
     public let source: URL
     public let existing: URL
     public let isFolder: Bool
+    /// What the two look like, when a server holds one of them and the sheet cannot read it from disk.
+    public let incomingItem: FolderItem?
+    public let existingItem: FolderItem?
 
-    public init(source: URL, existing: URL, isFolder: Bool) {
+    public init(source: URL, existing: URL, isFolder: Bool, incomingItem: FolderItem? = nil, existingItem: FolderItem? = nil) {
         self.source = source
         self.existing = existing
         self.isFolder = isFolder
+        self.incomingItem = incomingItem
+        self.existingItem = existingItem
     }
 }
 
@@ -32,11 +37,16 @@ public struct OperationProgress: Sendable {
     public let done: Int
     public let total: Int
     public let current: String
+    /// Bytes copied so far and in all, for a copy to or from a server. 0 for local copies.
+    public let bytesDone: Int64
+    public let bytesTotal: Int64
 
-    public init(done: Int, total: Int, current: String) {
+    public init(done: Int, total: Int, current: String, bytesDone: Int64 = 0, bytesTotal: Int64 = 0) {
         self.done = done
         self.total = total
         self.current = current
+        self.bytesDone = bytesDone
+        self.bytesTotal = bytesTotal
     }
 }
 

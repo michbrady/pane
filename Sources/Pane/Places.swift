@@ -73,6 +73,8 @@ final class Places {
     func isPinned(_ url: URL) -> Bool { pins.contains(url) }
 
     func pin(_ url: URL, at index: Int? = nil) {
+        // Quick access holds folders on this Mac. A server's folders are reached from Connections.
+        guard !RemoteURL.isRemote(url), url.isFileURL else { return }
         pins.pin(url, at: index)
         pinsChanged()
     }
