@@ -73,3 +73,9 @@ Symptom: found in a snapshot: the server row had an expand arrow.
 Cause: listing the server's URL as a local path read this Mac's root folder.
 Fix: rows for servers never list folders in the tree.
 Rule: a remote URL must never reach a local file call. Check both the call and what it would show.
+
+## A snapshot taken while another run was alive showed an empty, inactive window (S-063)
+Symptom: the S3 snapshot had gray traffic lights, no sidebar, and no sheet.
+Cause: a failed build left a snapshot run waiting, and a second run started on top of it. My `pkill` pattern needed an argument that snapshot runs do not have, so it killed nothing.
+Fix: find the old run with `pgrep -f Contents/MacOS/Pane`, end it, then start one run and read its fresh files.
+Rule: one snapshot or self-test run at a time. Check the build printed "Build complete" before running, and check the PNG is the key window before judging it.

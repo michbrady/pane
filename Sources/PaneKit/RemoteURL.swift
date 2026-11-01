@@ -80,7 +80,7 @@ public enum RemoteURL {
         return canonical(url)
     }
 
-    static func pathComponents(_ url: URL) -> [String] {
+    public static func pathComponents(_ url: URL) -> [String] {
         url.path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
     }
 }

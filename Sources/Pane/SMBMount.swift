@@ -27,13 +27,13 @@ enum SMBMount {
 
 /// A share's password, kept in the Keychain when the person asks for that.
 enum PasswordKeychain {
-    private static func query(server: String, account: String) -> [String: Any] {
+    private static func query(server: String, account: String, proto: CFString) -> [String: Any] {
         [kSecClass as String: kSecClassInternetPassword, kSecAttrServer as String: server,
-         kSecAttrAccount as String: account, kSecAttrProtocol as String: kSecAttrProtocolSMB]
+         kSecAttrAccount as String: account, kSecAttrProtocol as String: proto]
     }
 
-    static func save(_ password: String, server: String, account: String) {
-        let base = query(server: server, account: account)
+    static func save(_ password: String, server: String, account: String, proto: CFString = kSecAttrProtocolSMB) {
+        let base = query(server: server, account: account, proto: proto)
         let data = Data(password.utf8)
         if SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary) == errSecItemNotFound {
             var item = base
@@ -42,8 +42,8 @@ enum PasswordKeychain {
         }
     }
 
-    static func password(server: String, account: String) -> String? {
-        var request = query(server: server, account: account)
+    static func password(server: String, account: String, proto: CFString = kSecAttrProtocolSMB) -> String? {
+        var request = query(server: server, account: account, proto: proto)
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: AnyObject?

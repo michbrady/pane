@@ -92,5 +92,56 @@ extension SelfTest {
         check("a tab that was on it goes home", !model.tab.isRemote)
         model.tab.go(to: c.docs)
         await settle()
+
+        // S-063 Connect to an S3 account (a stub stands in for the network and the Keychain)
+        let s3Log = S3Log()
+        model.connections.makeS3 = { endpoint, region, credentials in
+            S3FileSystem(endpoint: endpoint, region: region, credentials: credentials, transport: StubS3(goodKey: "GOODKEY"))
+        }
+        model.connections.saveSecret = { _, server, account in s3Log.saved.append("\(server)/\(account)") }
+        model.connections.savedSecret = { _, account in account == "GOODKEY" ? "stored-secret" : nil }
+        model.connections.openConnectSheet()
+        model.connections.connectS3(accessKey: "", secretKey: "x", region: "us-east-1", endpoint: "", remember: false)
+        check("S3 asks for the access key", model.connections.connectError == "Type the access key.")
+        model.connections.connectS3(accessKey: "GOODKEY", secretKey: "", region: "us-east-1", endpoint: "", remember: false)
+        await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
+        check("a secret saved earlier is used when the field is empty", model.router.serverKeys == ["s3://s3.us-east-1.amazonaws.com"], "\(model.router.serverKeys)")
+        model.disconnect(serverKey: "s3://s3.us-east-1.amazonaws.com")
+        model.connections.openConnectSheet()
+        model.connections.connectS3(accessKey: "WRONG", secretKey: "nope", region: "us-east-1", endpoint: "", remember: true)
+        await Wait.until { !model.connections.isConnecting }
+        check("a wrong key says Access denied. and keeps the sheet open",
+              model.connections.connectError == "Access denied." && model.connections.showConnectSheet && model.router.serverKeys.isEmpty,
+              model.connections.connectError ?? "nil")
+        check("a wrong key is not saved to the Keychain", s3Log.saved.isEmpty)
+        model.connections.connectS3(accessKey: "GOODKEY", secretKey: "secret", region: "eu-west-1", endpoint: "https://minio.local:9000/", remember: true)
+        await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
+        await settle()
+        check("a good key closes the sheet and shows the buckets as folders",
+              !model.connections.showConnectSheet && model.tab.isRemote && model.tab.items.map(\.name) == ["photos"] && model.tab.items.first?.isFolder == true,
+              "\(model.tab.currentFolder) \(model.tab.items.map(\.name))")
+        check("the endpoint decides the server", model.router.serverKeys == ["s3://minio.local:9000"], "\(model.router.serverKeys)")
+        check("Remember saves the secret under the endpoint and key", s3Log.saved == ["minio.local:9000/GOODKEY"], "\(s3Log.saved)")
+        model.disconnect(serverKey: "s3://minio.local:9000")
+        await settle()
+        model.tab.go(to: c.docs)
+        await settle()
+    }
+}
+
+private final class S3Log {
+    var saved: [String] = []
+}
+
+/// Answers like S3 does: buckets for the good key, "InvalidAccessKeyId" for any other.
+private struct StubS3: S3Transport {
+    let goodKey: String
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let auth = request.value(forHTTPHeaderField: "Authorization") ?? ""
+        let ok = auth.contains("Credential=\(goodKey)/")
+        let body = ok
+            ? "<ListAllMyBucketsResult><Buckets><Bucket><Name>photos</Name><CreationDate>2026-01-01T00:00:00.000Z</CreationDate></Bucket></Buckets></ListAllMyBucketsResult>"
+            : "<Error><Code>InvalidAccessKeyId</Code><Message>The access key does not exist.</Message></Error>"
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: ok ? 200 : 403, httpVersion: nil, headerFields: nil)!)
     }
 }

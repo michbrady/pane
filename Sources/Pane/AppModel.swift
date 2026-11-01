@@ -93,6 +93,10 @@ final class AppModel {
         places.alert = { [unowned self] message in actions.alertMessage = message }
         places.serverKeys = { [unowned self] in router.serverKeys }
         places.disconnect = { [unowned self] key in disconnect(serverKey: key) }
+        connections.didConnect = { [unowned self] server, place in
+            connected(server)
+            tab.go(to: place)
+        }
         connections.didMount = { [unowned self] mountpoint in
             places.refreshVolumes()
             tab.go(to: mountpoint)

@@ -510,7 +510,8 @@ Acceptance:
 - [unit] A listing with a `/` delimiter turns common prefixes into folders and keys into files, and follows `NextContinuationToken` past 1,000 keys.
 - [self] A wrong key shows "Access denied." under the field.
 - [manual] Browse a real bucket and a MinIO bucket.
-Status: todo
+Note: Connect to Server now has a Type picker (File Share, Amazon S3). S3 signs with Signature Version 4 (the AWS docs example gives the expected signature), lists buckets at the top and prefixes as folders, follows continuation tokens, and says "Access denied." for a wrong key. The secret goes to the Keychain only when ticked. [manual] A real AWS bucket and a MinIO bucket are still to try. Browsing only until S-064 and S-065.
+Status: done
 
 ### S-064 Copy between this Mac and a remote place
 As the user, I copy, cut, paste, or drag files between local and remote folders, and both ways.
