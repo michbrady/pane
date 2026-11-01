@@ -93,52 +93,7 @@ struct FolderPage: View {
         .searchFocused($searchFocused)
         .onChange(of: tab.searchText) { _, text in tab.search(text) }
         .onChange(of: model.searchFocusRequests) { searchFocused = true }
-        .toolbar { CommandBar(view: model.view) }
-    }
-}
-
-/// Explorer's Command bar as the window toolbar. Items dim until their stories land.
-private struct CommandBar: ToolbarContent {
-    let view: ViewSettings
-
-    var body: some ToolbarContent {
-        ToolbarItemGroup {
-            Menu("New", systemImage: "plus") {
-                Button("Folder") {}
-                Button("File") {}
-            }
-            .help("Make a new folder or file (⇧⌘N)")
-            .disabled(true)
-            Button("Cut", systemImage: "scissors") {}
-                .help("Cut the selected items (⌘X)")
-                .disabled(true)
-            Button("Copy", systemImage: "doc.on.doc") {}
-                .help("Copy the selected items (⌘C)")
-                .disabled(true)
-            Button("Paste", systemImage: "doc.on.clipboard") {}
-                .help("Paste the items here (⌘V)")
-                .disabled(true)
-            Button("Rename", systemImage: "pencil") {}
-                .help("Rename the selected item (F2)")
-                .disabled(true)
-            Button("Move to Trash", systemImage: "trash") {}
-                .help("Move the selected items to the Trash (⌫)")
-                .disabled(true)
-        }
-        ToolbarSpacer(.fixed)
-        ToolbarItemGroup {
-            Menu("Sort", systemImage: "arrow.up.arrow.down") {}
-                .help("Choose how items are ordered")
-                .disabled(true)
-            Menu("View", systemImage: "list.bullet") {}
-                .help("Choose how items are shown")
-                .disabled(true)
-        }
-        ToolbarSpacer(.fixed)
-        ToolbarItem {
-            Button("Preview Pane", systemImage: "sidebar.trailing") { view.showPreview.toggle() }
-                .help("Show or hide the preview pane (⇧⌘P)")
-        }
+        .toolbar { CommandBar(model: model) }
     }
 }
 

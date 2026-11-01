@@ -383,7 +383,8 @@ Depends: S-011, S-013, S-015
 Acceptance:
 - [snap] Buttons dim when they do not apply.
 - [self] Each button matches its keyboard shortcut.
-Status: todo
+Note: the New button makes a folder. A "New file" choice is not built (the file system layer has no way to make a file yet). Sort and View are real menus, and each button matches a menu command.
+Status: done
 
 ### S-042 Open from other apps in Pane
 As the user, I turn on "Use Pane to open folders" and see Reveal in Finder from other apps open Pane.

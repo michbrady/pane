@@ -58,6 +58,9 @@ final class FileActions {
 
     private var editingText: NSText? { NSApp.keyWindow?.firstResponder as? NSText }
 
+    /// True when the pasteboard holds files to paste.
+    var canPaste: Bool { !clipboard.urls.isEmpty }
+
     func isCut(_ url: URL) -> Bool { clipboard.isCut(url) }
 
     func copySelection() {
