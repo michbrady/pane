@@ -195,6 +195,14 @@ final class AppModel {
         connections.remove(id)
     }
 
+    /// Return on the selection: opens it, or renames it when Settings says so. False when nothing is selected.
+    @discardableResult
+    func pressReturn() -> Bool {
+        guard !tab.selection.isEmpty else { return false }
+        if view.returnRenames, actions.canRename { actions.beginRename() } else { tab.openSelection() }
+        return true
+    }
+
     /// A server is connected: file it in the router and show it under Connections.
     func connected(_ server: any RemoteFileSystem) {
         router.register(server)

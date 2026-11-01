@@ -77,6 +77,13 @@ extension Connections {
         if !isConnecting { finish() }
     }
 
+    /// Deletes Pane's list of trusted SFTP servers. Never touches `~/.ssh/known_hosts`.
+    func forgetTrustedServers() {
+        try? FileManager.default.removeItem(at: Self.knownHostsFile)
+    }
+
+    static var knownHostsFile: URL { Locations.home.appending(path: "Library/Application Support/Pane/known_hosts") }
+
     /// For snapshots: a saved list without connecting or touching the Keychain.
     func savedForSnapshot(_ items: [SavedConnection]) {
         saved = SavedConnections(items: items)

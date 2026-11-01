@@ -37,6 +37,8 @@ final class ViewSettings {
     var showHidden: Bool { didSet { changed() } }
     /// Show ".pdf" after names. On by default, so a name is never ambiguous.
     var showExtensions: Bool { didSet { changed() } }
+    /// What Return does with the selection: open it (Explorer) or rename it (Finder).
+    var returnRenames: Bool { didSet { changed() } }
     /// Which columns show, and their order and widths, saved for each folder as JSON.
     private(set) var columnData: [String: Data]
     /// Called after any change, so open tabs can re-sort.
@@ -54,6 +56,7 @@ final class ViewSettings {
         foldersFirst = defaults.object(forKey: "view.foldersFirst") as? Bool ?? true
         showHidden = defaults.object(forKey: "view.showHidden") as? Bool ?? false
         showExtensions = defaults.object(forKey: "view.showExtensions") as? Bool ?? true
+        returnRenames = defaults.object(forKey: "view.returnRenames") as? Bool ?? false
     }
 
     /// A click on a column header: the same column flips the direction, a new one starts ascending.
@@ -90,6 +93,7 @@ final class ViewSettings {
         foldersFirst = true
         showHidden = false
         showExtensions = true
+        returnRenames = false
     }
 
     private func changed() {
@@ -100,6 +104,7 @@ final class ViewSettings {
         defaults.set(foldersFirst, forKey: "view.foldersFirst")
         defaults.set(showHidden, forKey: "view.showHidden")
         defaults.set(showExtensions, forKey: "view.showExtensions")
+        defaults.set(returnRenames, forKey: "view.returnRenames")
         onChange?()
     }
 }

@@ -17,9 +17,7 @@ struct FolderContent: View {
         // Dropping on empty space drops into the folder being shown.
         .acceptsFileDrops(into: model.tab.currentFolder, model: model)
         .onKeyPress(.return) {
-            guard !model.tab.selection.isEmpty else { return .ignored }
-            model.tab.openSelection()
-            return .handled
+            model.pressReturn() ? .handled : .ignored
         }
         .onKeyPress(.delete) {
             guard !model.tab.selection.isEmpty else { return .ignored }
@@ -93,7 +91,7 @@ struct FolderContent: View {
             if model.tab.isSearchRunning {
                 ProgressView("Searching…")
             } else {
-                ContentUnavailableView.search(text: model.tab.searchText)
+                ContentUnavailableView("No results for \(model.tab.searchText)", systemImage: "magnifyingglass")
             }
         } else if model.tab.loadProblem == .notConnected {
             ContentUnavailableView {

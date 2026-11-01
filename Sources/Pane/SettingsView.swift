@@ -25,6 +25,7 @@ struct SettingsView: View {
             case .general: GeneralSettings()
             case .appearance: AppearanceSettings()
             case .shortcuts: ShortcutSettings()
+            case .advanced: AdvancedSettings()
             }
         }
         .formStyle(.grouped)
@@ -35,7 +36,7 @@ struct SettingsView: View {
 
 /// The Settings tabs. Snapshot mode walks through every case.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, appearance, shortcuts
+    case general, appearance, shortcuts, advanced
 
     var id: String { rawValue }
 
@@ -44,6 +45,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "General"
         case .appearance: "Appearance"
         case .shortcuts: "Shortcuts"
+        case .advanced: "Advanced"
         }
     }
 
@@ -52,6 +54,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "gearshape"
         case .appearance: "paintpalette"
         case .shortcuts: "keyboard"
+        case .advanced: "gearshape.2"
         }
     }
 }
@@ -112,4 +115,29 @@ struct ShortcutSettings: View {
         ("Move to Trash", "Delete or ⌘Delete"), ("Cut, Copy, Paste", "⌘X, ⌘C, ⌘V"),
         ("New tab", "⌘T"), ("Go to tab", "⌘1 to ⌘9"), ("Preview pane", "⇧⌘P"),
     ]
+}
+
+struct AdvancedSettings: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        @Bindable var view = model.view
+        Section("Keys") {
+            Picker("Return key", selection: $view.returnRenames) {
+                Text("Opens the item").tag(false)
+                Text("Renames the item").tag(true)
+            }
+            Text("Opens is how Explorer works. Renames is how Finder works. Command-Down always opens, and F2 always renames.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+        Section("Items") {
+            Toggle("Show file extensions", isOn: $view.showExtensions)
+            Toggle("Show hidden items", isOn: $view.showHidden)
+        }
+        Section("Servers") {
+            Button("Forget Trusted SFTP Servers…") { model.connections.forgetTrustedServers() }
+            Text("Pane asks \u{201C}Trust this server?\u{201D} again the next time you connect to each one.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
 }

@@ -60,7 +60,7 @@ final class Connections {
         case .sftp:
             return SFTPFileSystem(host: connection.host, port: connection.port, user: connection.user,
                                   login: connection.useKey ? .key(path: connection.keyPath ?? "", passphrase: valid.secret) : .password(valid.secret),
-                                  knownHosts: Locations.home.appending(path: "Library/Application Support/Pane/known_hosts"),
+                                  knownHosts: Connections.knownHostsFile,
                                   workFolder: URL(fileURLWithPath: "/tmp/pane-ssh-\(getuid())", isDirectory: true))
         case .ftp, .ftps:
             return FTPFileSystem(host: connection.host, port: connection.port, user: connection.user, password: valid.secret, secure: connection.kind == .ftps)

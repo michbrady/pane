@@ -576,7 +576,8 @@ As the user, I see a clear message in an empty folder or an empty search.
 Screens: empty-folder, search
 Acceptance:
 - [snap] Empty folder: "This folder is empty". Empty search: "No results for <text>".
-Status: todo
+Note: Empty folder shows "This folder is empty". An empty search shows "No results for <text>" (the system wording says "No Results for", so Pane words it itself). Both are `ContentUnavailableView`s, in light and dark snapshots.
+Status: done
 
 ### S-052 Change settings
 As the user, I open Settings to change shortcuts, folders-first, extensions, the opening folder and the handler.
@@ -585,13 +586,15 @@ Depends: S-021
 Acceptance:
 - [snap] Tabs: General, Shortcuts, Advanced.
 - [self] Return opens or renames can be switched.
-Status: todo
+Note: Settings tabs are General, Appearance, Shortcuts, and Advanced (Appearance was already there). Advanced has the Return key choice (opens, like Explorer, or renames, like Finder; Command-Down always opens and F2 always renames), file extensions, hidden items, and "Forget Trusted SFTP Servers…" (only Pane's own list, never ~/.ssh). The opening folder and the folder handler were already in General.
+Status: done
 
 ### S-053 Give Pane an icon
 As the user, I see a Liquid Glass icon in the Dock and window.
 Acceptance:
 - [snap] The icon looks right in light, dark, and tinted looks.
-Status: todo
+Note: The icon is an Icon Composer file, a folder with a navigation pane and a content pane. `tools/icon_review.sh` shows it clear in Default, Dark, Tinted, and Clear, and at 32 and 16 pt. [manual] The Dock after an install.
+Status: done
 
 ### S-054 Make Pane keyboard friendly
 As the user, I move focus between tree, list and address bar with F6.
