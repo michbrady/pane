@@ -498,7 +498,8 @@ Acceptance:
 - [self] A host key I have not seen asks "Trust this server?" with its fingerprint. A changed key stops with a warning.
 - [manual] A key with a passphrase asks for it once and keeps it in the Keychain on request. [U] Decide the library: libssh2, or the system `sftp`. Test both for speed on 10,000 files.
 - [unit] Remote paths with spaces and non-ASCII names round-trip.
-Status: todo
+Note: Decided: the system `sftp` over one shared ssh connection (no library to ship; it reads your keys, agent, and ssh config). The password or passphrase reaches it through the environment of that one child process, never its arguments. Servers are trusted in Pane's own list, never `~/.ssh/known_hosts`. Tested with a scripted runner: listing parse (spaces, accents, years), quoting, error words, the trust question, a changed key. [manual] A real server, a key with a passphrase, and the speed of a 10,000-file folder. Known limit: a symbolic link shows as a file until S-066 can tell where it points. Browsing only until S-064 and S-065.
+Status: done
 
 ### S-063 Browse an S3 bucket
 As the user, I add an S3 account with an access key and secret, pick a bucket, and browse its prefixes as folders.

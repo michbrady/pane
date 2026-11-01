@@ -36,6 +36,14 @@ public enum RemoteURL {
         return parts.url ?? url
     }
 
+    /// The place named `name` inside `folder`, with the name encoded.
+    public static func child(of folder: URL, named name: String) -> URL {
+        var parts = URLComponents(url: canonical(folder), resolvingAgainstBaseURL: false) ?? URLComponents()
+        let base = parts.path.hasSuffix("/") ? parts.path : parts.path + "/"
+        parts.path = base + name
+        return parts.url ?? folder
+    }
+
     /// The folder above, or nil at the top of the server.
     public static func parent(of url: URL) -> URL? {
         let here = canonical(url)

@@ -7,7 +7,23 @@ public enum RemoteError: Error, Equatable, Sendable {
     case notConnected
     /// The server said no, with its reason.
     case denied(String)
+    /// A server Pane has not seen before. `keyLine` is what to remember if the person trusts it.
+    case unknownHostKey(fingerprint: String, keyLine: String)
+    /// The server's key is not the one Pane remembered. Never connect past this.
+    case hostKeyChanged
     case other(String)
+}
+
+extension RemoteError {
+    /// What to tell the person.
+    public var message: String {
+        switch self {
+        case .connectionLost, .notConnected: "Unable to reach the server."
+        case .denied(let reason), .other(let reason): reason
+        case .unknownHostKey: "Pane does not know this server yet."
+        case .hostKeyChanged: "This server's key changed since you last connected. Pane stopped, in case it is not the same server."
+        }
+    }
 }
 
 /// A file system on a server. FTP, SFTP, and S3 each provide one. It works on URLs like

@@ -1,3 +1,4 @@
+import AppKit
 import PaneKit
 import SwiftUI
 
@@ -11,6 +12,10 @@ struct ConnectSheet: View {
     @State private var remember = false
     @State private var accessKey = ""
     @State private var region = "us-east-1"
+    @State private var host = ""
+    @State private var port = ""
+    @State private var useKey = false
+    @State private var keyPath = ""
     @State private var endpoint = ""
 
     var body: some View {
@@ -30,6 +35,27 @@ struct ConnectSheet: View {
                     SecureField("Password", text: $password)
                         .onSubmit(connect)
                     Toggle("Remember this password in my Keychain", isOn: $remember)
+                case .sftp:
+                    TextField("Server", text: $host, prompt: Text("nas.local"))
+                    TextField("Port", text: $port, prompt: Text("22"))
+                    TextField("User Name", text: $user)
+                    Picker("Sign in with", selection: $useKey) {
+                        Text("Password").tag(false)
+                        Text("Key").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    if useKey {
+                        HStack {
+                            Text(keyPath.isEmpty ? "No key chosen" : URL(fileURLWithPath: keyPath).lastPathComponent)
+                                .foregroundStyle(keyPath.isEmpty ? .secondary : .primary)
+                                .lineLimit(1)
+                            Spacer()
+                            Button("Choose Key…", action: chooseKey)
+                        }
+                    }
+                    SecureField(useKey ? "Key Passphrase" : "Password", text: $password, prompt: useKey ? Text("Leave empty if the key has none") : nil)
+                        .onSubmit(connect)
+                    Toggle(useKey ? "Remember the passphrase in my Keychain" : "Remember this password in my Keychain", isOn: $remember)
                 case .s3:
                     TextField("Access Key", text: $accessKey)
                     SecureField("Secret Key", text: $password)
@@ -40,6 +66,18 @@ struct ConnectSheet: View {
                 }
             }
             .textFieldStyle(.roundedBorder)
+            if let pending = model.connections.pendingTrust {
+                VStack(alignment: .leading, spacing: Space.sm) {
+                    Label("Trust this server?", systemImage: "lock.shield").font(.callout.bold())
+                    Text("Pane has not connected to \(pending.host) before. Check that this fingerprint is the one your server shows.")
+                        .font(.callout)
+                    Text(pending.fingerprint).font(.callout.monospaced()).textSelection(.enabled)
+                    HStack {
+                        Button("Trust and Connect") { model.connections.trustPendingServer() }
+                        Button("Don't Trust") { model.connections.declinePendingServer() }
+                    }
+                }
+            }
             if let error = model.connections.connectError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.red)
@@ -82,7 +120,18 @@ struct ConnectSheet: View {
     private func connect() {
         switch model.connections.kind {
         case .share: model.connections.connect(address: address, user: user, password: password, remember: remember)
+        case .sftp: model.connections.connectSFTP(host: host, port: port, user: user, useKey: useKey, keyPath: keyPath, secret: password, remember: remember)
         case .s3: model.connections.connectS3(accessKey: accessKey, secretKey: password, region: region, endpoint: endpoint, remember: remember)
         }
+    }
+
+    /// Starts in `~/.ssh`, where keys live. Hidden folders show, since that folder is one.
+    private func chooseKey() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".ssh", directoryHint: .isDirectory)
+        panel.showsHiddenFiles = true
+        panel.canChooseDirectories = false
+        panel.message = "Choose your private key file."
+        if panel.runModal() == .OK, let url = panel.url { keyPath = url.path }
     }
 }

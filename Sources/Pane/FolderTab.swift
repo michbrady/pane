@@ -268,10 +268,10 @@ final class FolderTab: Identifiable {
                         items = []
                         loadProblem = .notConnected
                         loadError = "Not connected to this server."
-                    case .denied(let reason), .other(let reason):
+                    case .denied, .other, .unknownHostKey, .hostKeyChanged:
                         items = []
                         loadProblem = .unreadable
-                        loadError = reason
+                        loadError = remote.message
                     }
                 } else {
                     items = []
