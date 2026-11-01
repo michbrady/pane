@@ -27,7 +27,7 @@ enum Snapshot {
             model.closeProperties()
             model.dismissFullDiskAccessGuide()
             model.closeConnectSheet()
-            if self != .network { model.volumeSource = { [] }; model.refreshVolumes() }
+            if self != .network { model.places.volumeSource = { [] }; model.places.refreshVolumes() }
             model.closeOtherTabs(except: model.tab)
             switch self {
             case .window:
@@ -105,11 +105,11 @@ enum Snapshot {
             case .network:
                 let backup = home.appending(path: "Volumes/Backup", directoryHint: .isDirectory)
                 let nas = home.appending(path: "Volumes/NAS", directoryHint: .isDirectory)
-                model.volumeSource = {
+                model.places.volumeSource = {
                     [VolumeInfo(url: backup, name: "Backup", isLocal: true, isEjectable: true),
                      VolumeInfo(url: nas, name: "photos on nas", isLocal: false, isEjectable: true)]
                 }
-                model.refreshVolumes()
+                model.places.refreshVolumes()
                 model.tab.go(to: nas)
             case .unavailable:
                 let gone = home.appending(path: "Volumes/Gone", directoryHint: .isDirectory)
@@ -126,8 +126,8 @@ enum Snapshot {
                 model.recentServersForSnapshot(["smb://nas/photos", "smb://backup.local/files"])
                 model.openConnectSheet()
             case .cloud:
-                model.refreshVolumes()
-                if let icloud = model.cloudRoots.first { model.tab.go(to: icloud.url) }
+                model.places.refreshVolumes()
+                if let icloud = model.places.cloudRoots.first { model.tab.go(to: icloud.url) }
             case .onboarding:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.showFullDiskAccessGuideForSnapshot()

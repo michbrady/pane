@@ -38,8 +38,8 @@ extension SelfTest {
         model.cancelEditingAddress()
         check("Escape restores the breadcrumbs", !model.isEditingAddress)
 
-        check("the tree follows the current folder", model.navSelection == "home:" + work.standardizedFileURL.path, model.navSelection ?? "nil")
-        check("the tree opens the folders above", model.expanded.contains("home:" + docs.standardizedFileURL.path))
+        check("the tree follows the current folder", model.places.navSelection == "home:" + work.standardizedFileURL.path, model.places.navSelection ?? "nil")
+        check("the tree opens the folders above", model.places.expanded.contains("home:" + docs.standardizedFileURL.path))
 
         try? Data("new".utf8).write(to: work.appending(path: "Added.txt"))
         await Wait.until { model.tab.items.contains { $0.name == "Added.txt" } }

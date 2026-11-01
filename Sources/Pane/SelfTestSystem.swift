@@ -69,40 +69,40 @@ extension SelfTest {
         // S-044 Browse network and iCloud: drives and shares
         let backup = c.home.appending(path: "Volumes/Backup", directoryHint: .isDirectory)
         let nas = c.home.appending(path: "Volumes/NAS", directoryHint: .isDirectory)
-        model.volumeSource = {
+        model.places.volumeSource = {
             [VolumeInfo(url: backup, name: "Backup", isLocal: true, isEjectable: true),
              VolumeInfo(url: nas, name: "NAS", isLocal: false, isEjectable: true)]
         }
-        model.refreshVolumes()
-        check("a drive shows under This Mac", model.thisMacRoots.map(\.name).contains("Backup"), "\(model.thisMacRoots.map(\.name))")
-        check("a share shows under Network", model.networkRoots.map(\.name) == ["NAS"])
-        check("drives and shares can be ejected", model.driveRoots.first?.ejectable == true && model.networkRoots.first?.ejectable == true)
-        check("the home folder cannot be ejected", model.homeRoot.ejectable == false)
+        model.places.refreshVolumes()
+        check("a drive shows under This Mac", model.places.thisMacRoots.map(\.name).contains("Backup"), "\(model.places.thisMacRoots.map(\.name))")
+        check("a share shows under Network", model.places.networkRoots.map(\.name) == ["NAS"])
+        check("drives and shares can be ejected", model.places.driveRoots.first?.ejectable == true && model.places.networkRoots.first?.ejectable == true)
+        check("the home folder cannot be ejected", model.places.homeRoot.ejectable == false)
         model.tab.isNetworkFolder = { $0.path.contains("/Volumes/NAS") }
         model.tab.go(to: nas)
         await settle()
-        check("opening a share selects its row under Network", model.navSelection == "net:" + nas.standardizedFileURL.path, model.navSelection ?? "nil")
+        check("opening a share selects its row under Network", model.places.navSelection == "net:" + nas.standardizedFileURL.path, model.places.navSelection ?? "nil")
         check("a network folder is looked at again every ten seconds", model.tab.pollInterval == 10)
         model.tab.go(to: backup)
         await settle()
-        check("a drive's row is selected under This Mac", model.navSelection == "vol:" + backup.standardizedFileURL.path, model.navSelection ?? "nil")
+        check("a drive's row is selected under This Mac", model.places.navSelection == "vol:" + backup.standardizedFileURL.path, model.places.navSelection ?? "nil")
         check("a local folder is not polled", model.tab.pollInterval == nil)
-        model.volumeSource = { [] }
-        model.refreshVolumes()
-        check("an ejected share leaves the tree", model.networkRoots.isEmpty && !model.thisMacRoots.map(\.name).contains("Backup"))
+        model.places.volumeSource = { [] }
+        model.places.refreshVolumes()
+        check("an ejected share leaves the tree", model.places.networkRoots.isEmpty && !model.places.thisMacRoots.map(\.name).contains("Backup"))
         model.tab.isNetworkFolder = { VolumeInfo.isNetwork($0) }
         model.tab.go(to: c.docs)
         await settle()
 
         // S-048 Use cloud storage folders
-        model.refreshVolumes()
+        model.places.refreshVolumes()
         check("iCloud Drive and the cloud services show under Cloud",
-              model.cloudRoots.map(\.name) == ["iCloud Drive", "Dropbox", "Google Drive (me@example.com)"], "\(model.cloudRoots.map(\.name))")
-        let iCloud = model.cloudRoots[0].url
+              model.places.cloudRoots.map(\.name) == ["iCloud Drive", "Dropbox", "Google Drive (me@example.com)"], "\(model.places.cloudRoots.map(\.name))")
+        let iCloud = model.places.cloudRoots[0].url
         model.tab.go(to: iCloud)
         await settle()
         check("the tab names iCloud Drive by its name", model.tab.currentName == "iCloud Drive", model.tab.currentName)
-        check("opening a cloud folder selects its row under Cloud", model.navSelection == "cloud:" + iCloud.path, model.navSelection ?? "nil")
+        check("opening a cloud folder selects its row under Cloud", model.places.navSelection == "cloud:" + iCloud.path, model.places.navSelection ?? "nil")
         let report = model.tab.items.first { $0.name == "Report.pdf" }
         check("an old iCloud stub shows under the real name with its size", report?.isOnlineOnly == true && report?.size == 482304,
               "\(model.tab.items.map(\.name))")
@@ -140,16 +140,16 @@ extension SelfTest {
         check("going to a folder that exists clears the message", model.tab.loadProblem == nil)
         let gone = c.home.appending(path: "Volumes/NAS2", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: gone, withIntermediateDirectories: true)
-        model.volumeSource = { [VolumeInfo(url: gone, name: "NAS2", isLocal: false, isEjectable: true)] }
-        model.refreshVolumes()
+        model.places.volumeSource = { [VolumeInfo(url: gone, name: "NAS2", isLocal: false, isEjectable: true)] }
+        model.places.refreshVolumes()
         model.tab.go(to: gone)
         await settle()
         try? FileManager.default.removeItem(at: gone)
-        model.volumeSource = { [] }
-        model.refreshVolumes()
+        model.places.volumeSource = { [] }
+        model.places.refreshVolumes()
         await settle()
         check("a share that disappears leaves the tree and its open folder says so",
-              model.networkRoots.isEmpty && model.tab.loadProblem == .unavailable, "\(model.tab.loadProblem as Any)")
+              model.places.networkRoots.isEmpty && model.tab.loadProblem == .unavailable, "\(model.tab.loadProblem as Any)")
         model.tab.go(to: c.docs)
         await settle()
 

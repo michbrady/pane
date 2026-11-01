@@ -43,20 +43,20 @@ extension SelfTest {
 
         // S-025 Pin folders to Quick access
         check("Desktop, Downloads, Documents, and Pictures are pinned at first",
-              model.quickRoots.map(\.name) == ["Desktop", "Downloads", "Documents", "Pictures"], "\(model.quickRoots.map(\.name))")
+              model.places.quickRoots.map(\.name) == ["Desktop", "Downloads", "Documents", "Pictures"], "\(model.places.quickRoots.map(\.name))")
         let pinned = home.appending(path: "Projects", directoryHint: .isDirectory)
         try? fm.createDirectory(at: pinned, withIntermediateDirectories: true)
-        model.pin(pinned)
-        check("Pin adds a Quick access row", model.quickRoots.last?.name == "Projects" && model.isPinned(pinned))
-        check("pinning twice adds one row", { model.pin(pinned); return model.quickRoots.filter { $0.name == "Projects" }.count == 1 }())
+        model.places.pin(pinned)
+        check("Pin adds a Quick access row", model.places.quickRoots.last?.name == "Projects" && model.places.isPinned(pinned))
+        check("pinning twice adds one row", { model.places.pin(pinned); return model.places.quickRoots.filter { $0.name == "Projects" }.count == 1 }())
         let moved = home.appending(path: "Work 2", directoryHint: .isDirectory)
         try? fm.moveItem(at: pinned, to: moved)
         model.tab.go(to: docs)
         model.tab.go(to: drop)
         await settle()
-        check("a pinned folder that was renamed still shows, under its new name", model.quickRoots.last?.name == "Work 2", "\(model.quickRoots.map(\.name))")
-        model.unpin(moved)
-        check("Unpin removes the row", !model.quickRoots.contains { $0.name == "Work 2" })
+        check("a pinned folder that was renamed still shows, under its new name", model.places.quickRoots.last?.name == "Work 2", "\(model.places.quickRoots.map(\.name))")
+        model.places.unpin(moved)
+        check("Unpin removes the row", !model.places.quickRoots.contains { $0.name == "Work 2" })
         check("pins are saved", Prefs.defaults.array(forKey: "pane.pins") != nil)
 
         // S-026 Tabs and S-027 Open a folder in a new tab
@@ -72,7 +72,7 @@ extension SelfTest {
         check("a tab keeps its own folder", first.currentFolder.path == docs.standardizedFileURL.path)
         check("a tab keeps its own selection", model.tab.selection.isEmpty && !first.selection.isEmpty)
         model.select(0)
-        check("selecting a tab shows it", model.tab === first && model.navSelection?.hasSuffix(docs.standardizedFileURL.path) == true, model.navSelection ?? "nil")
+        check("selecting a tab shows it", model.tab === first && model.places.navSelection?.hasSuffix(docs.standardizedFileURL.path) == true, model.places.navSelection ?? "nil")
         model.selectNextTab()
         check("Show Next Tab moves on", model.activeIndex == 1)
         model.selectNextTab()

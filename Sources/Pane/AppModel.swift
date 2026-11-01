@@ -51,21 +51,7 @@ final class AppModel {
     /// The items whose Properties panel is open.
     private(set) var propertiesURLs: [URL]?
 
-    // Navigation pane
-    private(set) var quickRoots: [NavNode]
-    private var pins: PinStore
-    let homeRoot: NavNode
-    private(set) var driveRoots: [NavNode] = []
-    private(set) var networkRoots: [NavNode] = []
-    /// iCloud Drive and the cloud services installed on this Mac.
-    private(set) var cloudRoots: [NavNode] = []
-    var thisMacRoots: [NavNode] { [homeRoot] + driveRoots }
-    /// Where the mounted volumes come from. Tests use a fake list, so they see the same on every Mac.
-    var volumeSource: () -> [VolumeInfo] = { Locations.isOverridden ? [] : VolumeInfo.mounted() }
-    var expanded: Set<String> {
-        didSet { Prefs.defaults.set(Array(expanded), forKey: "pane.expanded") }
-    }
-    var navSelection: String?
+    let places = Places()
 
     // Address bar
     var isEditingAddress = false
@@ -82,12 +68,6 @@ final class AppModel {
     }
     init() {
         let defaults = Prefs.defaults
-        let store = PinStore(saved: defaults.array(forKey: "pane.pins") as? [Data], defaults: Locations.quickAccess)
-        pins = store
-        quickRoots = store.urls.map { NavNode(url: $0, prefix: "quick:") }
-        homeRoot = NavNode(url: Locations.home, prefix: "home:")
-        expanded = Set(defaults.stringArray(forKey: "pane.expanded") ?? [])
-
         let env = ProcessInfo.processInfo.environment
         var starts: [URL] = []
         var active = 0
@@ -109,15 +89,14 @@ final class AppModel {
         activeIndex = active
         for tab in tabs { tab.begin() }
         activated()
-        refreshVolumes()
-        if !Locations.isOverridden {
-            // A drive or share appeared, went away, or was renamed.
-            for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {
-                NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.refreshVolumes() }
-                }
-            }
+        places.currentFolder = { [unowned self] in tab.currentFolder }
+        places.goTo = { [unowned self] url in tab.go(to: url) }
+        places.volumesChanged = { [unowned self] in
+            // A tab showing a folder on a volume that just went away says so.
+            for tab in tabs where !FileManager.default.fileExists(atPath: tab.currentFolder.path) { tab.reload() }
         }
+        places.alert = { [unowned self] message in actions.alertMessage = message }
+        places.start()
         GlobalHotKey.shared.onPress = { [unowned self] in globalShortcutPressed() }
         GlobalHotKey.shared.start()
         // Tests and snapshots never ask. A person gets the screen once, if Pane lacks access.
@@ -179,8 +158,8 @@ final class AppModel {
     /// What changes when the shown tab changes or navigates: the tree, the Address bar, saved state.
     private func activated() {
         isEditingAddress = false
-        refreshPins()
-        syncTree()
+        places.refreshPins()
+        places.syncTree()
         saveTabs()
     }
 
@@ -268,52 +247,6 @@ final class AppModel {
         propertiesURLs = nil
     }
 
-    // MARK: Quick access
-
-    func isPinned(_ url: URL) -> Bool { pins.contains(url) }
-
-    func pin(_ url: URL, at index: Int? = nil) {
-        pins.pin(url, at: index)
-        pinsChanged()
-    }
-
-    func unpin(_ url: URL) {
-        pins.unpin(url)
-        pinsChanged()
-    }
-
-    private func pinsChanged() {
-        Prefs.defaults.set(pins.bookmarks, forKey: "pane.pins")
-        refreshPins()
-        syncTree()
-    }
-
-    /// Rebuilds the Quick access rows when a pinned folder was renamed or moved.
-    private func refreshPins() {
-        let urls = pins.urls
-        guard urls.map(\.path) != quickRoots.map(\.url.path) else { return }
-        quickRoots = urls.map { NavNode(url: $0, prefix: "quick:") }
-    }
-
-    // MARK: Navigation pane
-
-    /// Expands the folders above the current one and selects its row.
-    private func syncTree() {
-        let url = tab.currentFolder
-        // The root that holds this folder: the home folder, a drive, or a share. The deepest one wins.
-        let roots: [(prefix: String, path: String)] =
-            [("home:", Locations.home.path)] + driveRoots.map { ("vol:", $0.url.path) } + networkRoots.map { ("net:", $0.url.path) }
-            + cloudRoots.map { ("cloud:", $0.url.path) } + [("vol:", "/")]
-        let holder = roots.filter { url.path == $0.path || url.path.hasPrefix($0.path == "/" ? "/" : $0.path + "/") }
-            .max { $0.path.count < $1.path.count } ?? ("vol:", "/")
-        let pinned = quickRoots.contains { $0.url.path == url.path }
-        navSelection = pinned ? "quick:" + url.path : holder.prefix + url.path
-        for ancestor in Breadcrumbs.chain(for: url).dropLast()
-        where ancestor.path.count >= holder.path.count && (ancestor.path == holder.path || ancestor.path.hasPrefix(holder.path == "/" ? "/" : holder.path + "/")) {
-            expanded.insert(holder.prefix + ancestor.path)
-        }
-    }
-
     // MARK: Opening folders for other apps
 
     /// Settings > "Use Pane to open folders". On remembers what was set before, and off puts it back.
@@ -395,48 +328,12 @@ final class AppModel {
                 Prefs.defaults.set(recentServers.items, forKey: "pane.recentServers")
                 if remember, !account.isEmpty, !secret.isEmpty { savePassword(secret, address.host, account) }
                 showConnectSheet = false
-                refreshVolumes()
+                places.refreshVolumes()
                 tab.go(to: mountpoint)
             case .failure(let failure):
                 connectError = ConnectionError.message(forCode: failure.code)
             }
         }
-    }
-
-    // MARK: Drives and shares
-
-    /// Reads the mounted volumes again: drives go under This Mac and shares under Network.
-    func refreshVolumes() {
-        let sections = VolumeSections.split(volumeSource())
-        driveRoots = sections.drives.map { NavNode(url: $0.url, prefix: "vol:", name: $0.name, ejectable: $0.isEjectable) }
-        networkRoots = sections.network.map { NavNode(url: $0.url, prefix: "net:", name: $0.name, ejectable: true) }
-        let cloud = CloudLocations.list(home: Locations.home)
-        Locations.cloudNames = Dictionary(uniqueKeysWithValues: cloud.map { ($0.url.path, $0.name) })
-        cloudRoots = cloud.map { NavNode(url: $0.url, prefix: "cloud:", name: $0.name) }
-        // A tab showing a folder on a volume that just went away says so.
-        for tab in tabs where !FileManager.default.fileExists(atPath: tab.currentFolder.path) { tab.reload() }
-        syncTree()
-    }
-
-    /// The eject button beside a drive or share. A busy volume says so and stays.
-    func eject(_ node: NavNode) {
-        let url = node.url
-        let name = node.name
-        if tab.currentFolder.path.hasPrefix(url.path) { tab.go(to: Locations.home) }
-        Task {
-            do {
-                try await Task.detached { try NSWorkspace.shared.unmountAndEjectDevice(at: url) }.value
-            } catch {
-                actions.alertMessage = "Unable to eject \u{201C}\(name)\u{201D}. Items are in use."
-            }
-            refreshVolumes()
-        }
-    }
-
-    /// Row id to folder, for a click in the Navigation pane.
-    static func url(forNavID id: String) -> URL? {
-        guard let colon = id.firstIndex(of: ":") else { return nil }
-        return URL(fileURLWithPath: String(id[id.index(after: colon)...]))
     }
 
     // MARK: Address bar

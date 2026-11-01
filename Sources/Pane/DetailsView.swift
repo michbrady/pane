@@ -164,10 +164,10 @@ struct ItemMenu: View {
                 if let folder = model.tab.items.first(where: { urls.contains($0.url) && $0.isFolder }) {
                     Button("Open in New Tab") { model.newTab(at: folder.url) }
                     Button("Open in Terminal") { model.openInTerminal(folder.url) }
-                    if model.isPinned(folder.url) {
-                        Button("Unpin from Quick access") { model.unpin(folder.url) }
+                    if model.places.isPinned(folder.url) {
+                        Button("Unpin from Quick access") { model.places.unpin(folder.url) }
                     } else {
-                        Button("Pin to Quick access") { model.pin(folder.url) }
+                        Button("Pin to Quick access") { model.places.pin(folder.url) }
                     }
                 }
             }

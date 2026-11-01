@@ -5,31 +5,31 @@ struct NavigationPane: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        @Bindable var model = model
-        List(selection: $model.navSelection) {
+        @Bindable var places = model.places
+        List(selection: $places.navSelection) {
             Section("Quick access") {
-                ForEach(model.quickRoots) { NavRow(node: $0) }
+                ForEach(model.places.quickRoots) { NavRow(node: $0) }
                     // A folder dropped between rows is pinned there. Dropped on a row, it moves into that folder.
                     .dropDestination(for: URL.self) { urls, index in
-                        for (offset, url) in urls.enumerated() { model.pin(url, at: index + offset) }
+                        for (offset, url) in urls.enumerated() { model.places.pin(url, at: index + offset) }
                     }
             }
             Section("This Mac") {
-                ForEach(model.thisMacRoots) { NavRow(node: $0) }
+                ForEach(model.places.thisMacRoots) { NavRow(node: $0) }
             }
-            if !model.cloudRoots.isEmpty {
+            if !model.places.cloudRoots.isEmpty {
                 Section("Cloud") {
-                    ForEach(model.cloudRoots) { NavRow(node: $0) }
+                    ForEach(model.places.cloudRoots) { NavRow(node: $0) }
                 }
             }
-            if !model.networkRoots.isEmpty {
+            if !model.places.networkRoots.isEmpty {
                 Section("Network") {
-                    ForEach(model.networkRoots) { NavRow(node: $0) }
+                    ForEach(model.places.networkRoots) { NavRow(node: $0) }
                 }
             }
         }
-        .onChange(of: model.navSelection) { _, id in
-            guard let id, let url = AppModel.url(forNavID: id), url != model.tab.currentFolder else { return }
+        .onChange(of: model.places.navSelection) { _, id in
+            guard let id, let url = Places.url(forNavID: id), url != model.tab.currentFolder else { return }
             model.tab.go(to: url)
         }
     }
@@ -56,7 +56,7 @@ private struct NavRow: View {
             rowLabel
             if node.ejectable {
                 Spacer(minLength: 0)
-                Button("Eject", systemImage: "eject.fill") { model.eject(node) }
+                Button("Eject", systemImage: "eject.fill") { model.places.eject(node) }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .foregroundStyle(.secondary)
@@ -79,10 +79,10 @@ private struct NavRow: View {
         .contextMenu {
             Button("Open in New Tab") { model.newTab(at: node.url) }
             Button("Open in Terminal") { model.openInTerminal(node.url) }
-            if model.isPinned(node.url) {
-                Button("Unpin from Quick access") { model.unpin(node.url) }
+            if model.places.isPinned(node.url) {
+                Button("Unpin from Quick access") { model.places.unpin(node.url) }
             } else {
-                Button("Pin to Quick access") { model.pin(node.url) }
+                Button("Pin to Quick access") { model.places.pin(node.url) }
             }
         }
         .help("Show folders inside \(node.name)")
@@ -90,9 +90,9 @@ private struct NavRow: View {
 
     private var expansion: Binding<Bool> {
         Binding(
-            get: { model.expanded.contains(node.id) },
+            get: { model.places.expanded.contains(node.id) },
             set: { isOn in
-                if isOn { model.expanded.insert(node.id) } else { model.expanded.remove(node.id) }
+                if isOn { model.places.expanded.insert(node.id) } else { model.places.expanded.remove(node.id) }
             })
     }
 }
