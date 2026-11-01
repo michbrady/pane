@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Tell the browser both themes are supported before it paints, to avoid a flash of the wrong one. -->
+<meta name="color-scheme" content="light dark">
+<title>Pane: a Windows-style file manager for your Mac | BradysBit</title>
+<meta name="description" content="Pane is a free file manager for Mac with the Windows File Explorer layout: a folder tree on the left, tabs, an address bar, a details list, a preview pane, and FTP, SFTP, and S3 servers as folders. A BradysBit app.">
+<meta property="og:title" content="Pane: a Windows-style file manager for Mac">
+<meta property="og:description" content="The Windows File Explorer layout on your Mac, with servers as folders. Free. A BradysBit app.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.bradysbit.com/pane/">
+<link rel="canonical" href="https://www.bradysbit.com/pane/">
+<link rel="icon" href="data:image/svg+xml,{{FAVICON}}">
+<style>
+  :root {
+    /* Raw colors, one pair per token. The page picks the pair that matches the viewer's setting. */
+    --bg-light: #fbfcfd;        --bg-dark: #0f1417;
+    --surface-light: #ffffff;   --surface-dark: #172026;
+    --text-light: #14202a;      --text-dark: #e8eef2;
+    --muted-light: #4d5f6b;     --muted-dark: #9fb0bb;
+    --line-light: #dbe3e8;      --line-dark: #27343c;
+    --accent-light: #0a7a80;    --accent-dark: #4fd0d4;
+    --on-accent-light: #ffffff; --on-accent-dark: #062526;
+
+    /* Fallback for browsers without light-dark(). */
+    --bg: var(--bg-light);
+    --surface: var(--surface-light);
+    --text: var(--text-light);
+    --muted: var(--muted-light);
+    --line: var(--line-light);
+    --accent: var(--accent-light);
+    --on-accent: var(--on-accent-light);
+    @media (prefers-color-scheme: dark) {
+      --bg: var(--bg-dark);
+      --surface: var(--surface-dark);
+      --text: var(--text-dark);
+      --muted: var(--muted-dark);
+      --line: var(--line-dark);
+      --accent: var(--accent-dark);
+      --on-accent: var(--on-accent-dark);
+    }
+    @supports (color: light-dark(white, black)) {
+      --bg: light-dark(var(--bg-light), var(--bg-dark));
+      --surface: light-dark(var(--surface-light), var(--surface-dark));
+      --text: light-dark(var(--text-light), var(--text-dark));
+      --muted: light-dark(var(--muted-light), var(--muted-dark));
+      --line: light-dark(var(--line-light), var(--line-dark));
+      --accent: light-dark(var(--accent-light), var(--accent-dark));
+      --on-accent: light-dark(var(--on-accent-light), var(--on-accent-dark));
+    }
+
+    color-scheme: light dark;
+    accent-color: var(--accent);
+    --gutter: clamp(1rem, 4vw, 2rem);
+    --radius: 0.75rem;
+    --measure: 72rem;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 1rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { width: min(100% - 2 * var(--gutter), var(--measure)); margin-inline: auto; }
+  a { color: var(--accent); text-underline-offset: 0.2em; }
+  a:focus-visible, .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 0.25rem; }
+  img { max-width: 100%; height: auto; display: block; }
+  code { font: 0.92em ui-monospace, "SF Mono", Menlo, monospace; background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 0.1em 0.4em; border-radius: 0.3em; }
+
+  /* Header */
+  header { padding-block: 1.25rem; }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 0.75rem; text-decoration: none; color: inherit; }
+  .brand svg { width: 2.5rem; height: 2.5rem; flex: none; }
+  .brand b { font-size: 1.25rem; letter-spacing: -0.01em; display: block; line-height: 1.1; }
+  .brand small { color: var(--muted); font-size: 0.8rem; display: block; }
+  nav { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+  nav a { color: var(--muted); text-decoration: none; font-weight: 500; }
+  nav a:hover { color: var(--text); }
+
+  /* Hero */
+  .hero { padding-block: clamp(2rem, 7vw, 5rem) clamp(1.5rem, 4vw, 3rem); text-align: center; }
+  .eyebrow { display: inline-block; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; padding: 0.25rem 0.9rem; font-size: 0.85rem; margin-bottom: 1.25rem; }
+  h1 { font-size: clamp(2.2rem, 6vw, 4rem); line-height: 1.08; letter-spacing: -0.03em; margin: 0 auto 1rem; max-width: 18ch; text-wrap: balance; }
+  .lead { font-size: clamp(1.05rem, 2.2vw, 1.3rem); color: var(--muted); max-width: 40rem; margin: 0 auto 2rem; text-wrap: pretty; }
+  .actions { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.4rem; border-radius: 0.65rem; font-weight: 600; text-decoration: none; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+  .btn[aria-disabled="true"] { opacity: 0.65; cursor: not-allowed; }
+  .note { color: var(--muted); font-size: 0.9rem; margin-top: 0.9rem; }
+
+  .shot { margin: clamp(2rem, 5vw, 3.5rem) auto 0; max-width: 56rem; }
+  .shot img { border-radius: 0.9rem; box-shadow: 0 1.5rem 3rem -1rem rgb(0 0 0 / 0.35), 0 0 0 1px var(--line); aspect-ratio: 1400 / 916; }
+  figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 0.75rem; }
+
+  /* Sections */
+  section { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+  h2 { font-size: clamp(1.6rem, 3.5vw, 2.3rem); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 0.5rem; text-wrap: balance; }
+  .sub { color: var(--muted); max-width: 40rem; margin: 0 0 2rem; }
+
+  .steps { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); counter-reset: step; padding: 0; list-style: none; margin: 0; }
+  .steps li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; counter-increment: step; }
+  .steps li::before { content: counter(step); display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-weight: 700; margin-bottom: 0.75rem; }
+  .steps h3, .grid h3 { margin: 0 0 0.35rem; font-size: 1.1rem; }
+  .steps p, .grid p { margin: 0; color: var(--muted); }
+
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem; }
+
+  .split { display: grid; gap: clamp(1.5rem, 4vw, 3rem); grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); align-items: center; }
+  .split img { border-radius: 0.9rem; box-shadow: 0 1rem 2.5rem -1rem rgb(0 0 0 / 0.35), 0 0 0 1px var(--line); }
+
+  .soon { padding: 0; list-style: none; margin: 0; display: grid; gap: 0.75rem; }
+  .soon li { background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .soon b { display: block; }
+  .soon span { color: var(--muted); }
+
+  .band { background: var(--surface); border-block: 1px solid var(--line); }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1.5rem; margin: 0; }
+  dt { font-weight: 600; }
+  dd { margin: 0; color: var(--muted); }
+  @media (max-width: 34rem) { dl { grid-template-columns: 1fr; gap: 0.1rem; } dd { margin-bottom: 0.75rem; } }
+
+  .install { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+  .notice { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); padding: 1rem 1.25rem; margin-top: 1.25rem; }
+  .notice p { margin: 0 0 0.5rem; } .notice p:last-child { margin: 0; }
+  .sha { font: 0.8rem/1.4 ui-monospace, "SF Mono", Menlo, monospace; word-break: break-all; color: var(--muted); }
+  .list { padding-left: 1.2rem; margin: 0; } .list li { margin-bottom: 0.5rem; color: var(--muted); } .list b { color: var(--text); }
+  footer { padding-block: 2.5rem; color: var(--muted); font-size: 0.9rem; }
+  footer p { margin: 0 0 0.6rem; max-width: 52rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Pane by BradysBit, back to the top">
+      {{LOGO}}
+      <span><b>Pane</b><small>by BradysBit</small></span>
+    </a>
+    <nav aria-label="Page">
+      <a href="#layout">The layout</a>
+      <a href="#servers">Servers</a>
+      <a href="#install">Download</a>
+      <a href="#requirements">Requirements</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap">
+    <div class="hero">
+      <span class="eyebrow">A BradysBit app &middot; Version 0.1</span>
+      <h1>The Windows file manager layout, on your Mac.</h1>
+      <p class="lead">Switching from Windows? Pane gives you the File Explorer you know: a folder tree on the left, tabs, an address bar you can click and type in, a details list with sortable columns, a preview pane, and a status bar. It is a normal Mac app that works with the same files and folders as Finder.</p>
+      <div class="actions">
+        <a class="btn primary" href="Pane.dmg" download>Download for Mac</a>
+        <a class="btn" href="#layout">See the layout</a>
+      </div>
+      <p class="note">Free &middot; Version 0.1 &middot; {{DL_SIZE}} &middot; macOS 26 or later, Apple silicon &middot; <a href="#install">How to install it</a></p>
+
+      <figure class="shot">
+        <picture>
+          <source srcset="{{WINDOW_DARK}}" media="(prefers-color-scheme: dark)">
+          <img src="{{WINDOW_LIGHT}}" width="1400" height="916" alt="The Pane window: a folder tree on the left, a tab and an address bar with a path above a list of files with Name, Date modified, Type, and Size columns, and an item count at the bottom.">
+        </picture>
+        <figcaption>The Pane window, with made-up test files.</figcaption>
+      </figure>
+    </div>
+  </div>
+
+  <section id="layout">
+    <div class="wrap">
+      <h2>Where your hands expect things to be</h2>
+      <p class="sub">The layout and the keys follow Explorer. The window itself is a regular Mac window, with Mac menus, fonts, and your Mac&rsquo;s accent color.</p>
+      <div class="grid">
+        <div class="card"><h3>Navigation pane</h3><p>Quick access for the folders you pin, your Mac, your cloud folders, and your servers, in one tree. Drag a file onto a folder in the tree to move it there.</p></div>
+        <div class="card"><h3>Address bar</h3><p>Click a part of the path to jump there, or click empty space to type a path. Press F4 or Command-L to edit it. Arrows next to each folder show its neighbors.</p></div>
+        <div class="card"><h3>Tabs</h3><p>Open folders in tabs with Command-T, middle-click, or Open in New Tab. Drag files onto a tab to drop them in that folder.</p></div>
+        <div class="card"><h3>Details, List, and Icons</h3><p>Sort by any column, choose which columns show, and see hidden files and file extensions when you want them. Folders sort first, and file2 comes before file10.</p></div>
+        <div class="card"><h3>Cut, Copy, Paste, Undo</h3><p>Cut and paste to move, with Undo for what you did. A name that already exists asks you to replace, skip, or keep both. A long copy shows its progress, with Cancel.</p></div>
+        <div class="card"><h3>Find, preview, and properties</h3><p>Search from the top bar (F3 or Command-F), preview images, PDFs, and text in a side pane, and see a file&rsquo;s properties and tags.</p></div>
+        <div class="card"><h3>Keys you know</h3><p>F2 renames. Delete moves to the Trash. F6 moves between the tree, the list, and the address bar. Return opens an item, or renames it if you prefer Finder&rsquo;s way: it is a switch in Settings.</p></div>
+        <div class="card"><h3>Works beside Finder</h3><p>Pane can open the folders other apps open, like Show in Finder from a download. It is off until you turn it on, and turning it off puts back what was there.</p></div>
+        <div class="card"><h3>Private</h3><p>No account and no tracking. Pane connects to the internet only for servers you add yourself. <a href="privacy.html">Privacy and terms</a></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap split">
+      <div>
+        <h2>Servers show up as folders.</h2>
+        <p class="sub" style="margin-bottom:1rem">Add an <b>SFTP</b>, <b>FTP</b>, or <b>Amazon S3</b> server (or any S3-compatible service, like MinIO) under <b>Connections</b>, and browse it like a folder: the same list, the same address bar, tabs, and keys. Copy files to and from your Mac by drag and drop, or Copy and Paste. Rename, make folders, and delete. Windows shares (SMB) mount as drives, as on any Mac.</p>
+        <p class="sub" style="margin-bottom:0">Open a file on a server and Pane downloads it, opens it in its app, and sends your saves back. Passwords and secret keys are kept in your Mac&rsquo;s Keychain, only if you ask. A server has no Trash, so Pane asks before it deletes anything there.</p>
+      </div>
+      <picture>
+        <source srcset="{{REMOTE_DARK}}" media="(prefers-color-scheme: dark)">
+        <img src="{{REMOTE_LIGHT}}" width="1400" height="916" loading="lazy" alt="Pane showing a folder on a server called nas: the tree has a Connections section with the server, and the breadcrumbs read nas then Documents.">
+      </picture>
+    </div>
+  </section>
+
+  <section id="servers">
+    <div class="wrap">
+      <h2>Servers, in short</h2>
+      <p class="sub">What each kind can do in this version.</p>
+      <dl>
+        <dt>SFTP</dt><dd>Sign in with a password or a key from <code>~/.ssh</code>. The first time, Pane shows the server&rsquo;s fingerprint and asks <b>Trust this server?</b> A server whose key later changes is refused with a warning.</dd>
+        <dt>FTP</dt><dd>Choose <b>FTP with TLS</b>, the first choice, which hides your password. Plain FTP says so: it sends your password without encryption.</dd>
+        <dt>Amazon S3</dt><dd>An access key, a secret key, and a region. Add an endpoint for services like MinIO or Cloudflare R2. Buckets show as folders, and the part of a key before a slash is a folder. Files up to 5 GB.</dd>
+        <dt>Saved connections</dt><dd>Turn on <b>Save this connection</b> and it stays in the tree. Edit or remove it under <b>Manage Connections</b>. Removing one also removes its saved password.</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap split">
+      <picture>
+        <source srcset="{{TABS_DARK}}" media="(prefers-color-scheme: dark)">
+        <img src="{{TABS_LIGHT}}" width="1400" height="916" loading="lazy" alt="Pane with several tabs open above the address bar.">
+      </picture>
+      <div>
+        <h2>One window, many folders.</h2>
+        <p class="sub" style="margin-bottom:0">Tabs hold their own folder, history, and selection. Pane remembers your tabs, your view, and your columns for each folder, so it opens the way you left it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap split">
+      <div>
+        <h2>See a file before you open it.</h2>
+        <p class="sub" style="margin-bottom:0">Turn on the preview pane (Shift-Command-P) to see an image, a PDF, or a text file beside the list. Press Space for Quick Look.</p>
+      </div>
+      <picture>
+        <source srcset="{{PREVIEW_DARK}}" media="(prefers-color-scheme: dark)">
+        <img src="{{PREVIEW_LIGHT}}" width="1400" height="916" loading="lazy" alt="Pane with the preview pane open, showing a picture of the selected image file.">
+      </picture>
+    </div>
+  </section>
+
+  <section id="install" class="band">
+    <div class="wrap">
+      <h2>Download</h2>
+      <p class="sub">Pane 0.1 is free.</p>
+      <div class="actions" style="justify-content:flex-start;margin-bottom:1.5rem">
+        <a class="btn primary" href="Pane.dmg" download>Download Pane for Mac</a>
+        <span class="note" style="margin:0;align-self:center">Pane.dmg &middot; {{DL_SIZE}}</span>
+      </div>
+      <ol class="steps">
+        <li><h3>Open the download</h3><p>Double-click <code>Pane.dmg</code>. A window opens with Pane and your Applications folder.</p></li>
+        <li><h3>Drag Pane across</h3><p>Drag <b>Pane</b> onto <b>Applications</b>, as the arrow shows.</p></li>
+        {{STEP3}}
+      </ol>
+      <figure class="shot" style="margin-top:1.5rem;max-width:34rem">
+        <img src="{{INSTALLER}}" width="1200" height="800" loading="lazy" alt="The picture behind the icons in the install window: a teal background with an arrow pointing right and the words Drag Pane to the Applications folder.">
+        <figcaption>The picture in the install window. Pane and Applications sit on either side of the arrow.</figcaption>
+      </figure>
+      {{FIRST_OPEN_NOTE}}
+      <div class="notice">
+        <p><b>Pane asks for Full Disk Access, and you can say no.</b></p>
+        <p>macOS keeps some folders, like Mail and parts of Library, closed to apps. Pane can show them only if you allow Full Disk Access in System Settings. Without it, Pane works on everything else and tells you which folder it could not read. Nothing is sent anywhere either way.</p>
+      </div>
+      <div class="notice">
+        <p><b>Check your download.</b> In Terminal, run <code>shasum -a 256 Pane.dmg</code>. The result should be:</p>
+        <p class="sha">{{DL_SHA}}</p>
+      </div>
+      <div class="notice">
+        <p><b>If you like Pane, pass a tip my way.</b></p>
+        <p>Pane is free. If it saved you time, you can leave a tip on Ko-fi. Tips are optional and never expected.</p>
+        <p><a class="btn" href="https://ko-fi.com/bradysbit" rel="noopener">Leave a tip on Ko-fi</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Good to know</h2>
+      <ul class="list">
+        <li><b>Deleting on a server cannot be undone.</b> A server has no Trash. Pane asks first, and changes you make to files on a server have no Undo.</li>
+        <li><b>Not in this version:</b> two panes side by side, Windows-style tiles, browsing inside zip files, and renaming many files at once.</li>
+        {{NOTARY_BULLET}}
+      </ul>
+    </div>
+  </section>
+
+  <section id="requirements" class="band">
+    <div class="wrap">
+      <h2>Requirements</h2>
+      <dl>
+        <dt>A Mac</dt><dd>With Apple silicon, running macOS 26 or later.</dd>
+        <dt>Servers</dt><dd>Optional. SFTP and FTP use the tools that come with macOS, so there is nothing else to install.</dd>
+        <dt>Internet</dt><dd>Only to reach servers you add.</dd>
+      </dl>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>&copy; 2026 BradysBit.</b> Pane is a BradysBit app, free to use, and open source under the MIT license on <a href="https://github.com/michbrady/pane" rel="noopener">GitHub</a>. Pane collects no personal information: <a href="privacy.html">privacy and terms</a>.</p>
+    <p>If you like Pane, <a href="https://ko-fi.com/bradysbit" rel="noopener">pass a tip my way on Ko-fi</a>.</p>
+    <p>Windows and File Explorer are trademarks of Microsoft. Pane is not made by or connected to Microsoft. Finder, macOS, and Apple silicon belong to Apple. Amazon S3 belongs to Amazon.</p>
+  </div>
+</footer>
+
+</body>
+</html>

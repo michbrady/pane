@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Privacy and terms | Pane by BradysBit</title>
+<meta name="description" content="Pane collects no personal information. What stays on your Mac, what leaves it when you connect to a server, why it asks for Full Disk Access, and the terms for using Pane.">
+<link rel="canonical" href="https://www.bradysbit.com/pane/privacy.html">
+<link rel="icon" href="data:image/svg+xml,{{FAVICON}}">
+<style>{{STYLE}}
+  /* This page reads left to right, like a document. */
+  .doc h1 { text-align: left; margin: 0 0 0.5rem; max-width: none; font-size: clamp(2rem, 5vw, 3rem); }
+  .doc .lead { text-align: left; margin: 0 0 1rem; max-width: 42rem; }
+  .doc h2 { margin-top: 2.5rem; }
+  .doc h3 { margin: 1.75rem 0 0.5rem; font-size: 1.15rem; }
+  .doc p, .doc li { color: var(--muted); max-width: 46rem; }
+  .doc p b, .doc li b { color: var(--text); }
+  .doc ul { padding-left: 1.2rem; }
+  .doc li { margin-bottom: 0.6rem; }
+  .updated { color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="Pane by BradysBit, back to the Pane page">
+      {{LOGO}}
+      <span><b>Pane</b><small>by BradysBit</small></span>
+    </a>
+    <nav aria-label="Page">
+      <a href="./">Back to Pane</a>
+    </nav>
+  </div>
+</header>
+
+<main class="doc">
+  <div class="wrap">
+    <section>
+      <h1>Privacy and terms</h1>
+      <p class="updated">Last updated: November 1, 2026</p>
+      <p class="lead"><b>Pane does not collect, keep, or use your personal information.</b> There are no accounts, no analytics, no ads, and no tracking.</p>
+
+      <h2>Privacy</h2>
+
+      <h3>What stays on your Mac</h3>
+      <ul>
+        <li><b>Your settings:</b> your view, columns, tabs, pinned folders, the folders you opened last, and a few switches. They are saved in Pane&rsquo;s preferences on your Mac and nowhere else.</li>
+        <li><b>Your saved connections:</b> for each server you save, its type, name, user name (for S3, the access key), and port. The list is in Pane&rsquo;s preferences.</li>
+        <li><b>Your passwords and secret keys</b> are kept in your Mac&rsquo;s Keychain, and only if you tick the box that says so. They are never written to Pane&rsquo;s preferences, to a file, or to a command line. Removing a saved connection removes its saved password.</li>
+        <li><b>The servers you trusted:</b> when you trust an SFTP server, Pane keeps its public key in its own list, in <code>~/Library/Application Support/Pane</code>. It does not touch <code>~/.ssh/known_hosts</code>. Settings has a button to forget them.</li>
+        <li><b>Your files.</b> Pane shows and changes the files you point it at, and nothing else. BradysBit never receives any of it.</li>
+      </ul>
+
+      <h3>What leaves your Mac</h3>
+      <p>Only the servers you add. When you connect to an SFTP, FTP, or S3 server, or a Windows share, your Mac talks to that server directly, with the user name and password you gave. BradysBit does not see or keep these connections.</p>
+      <ul>
+        <li><b>SFTP</b> is encrypted. <b>FTP with TLS</b> is encrypted. <b>Plain FTP is not</b>: it sends your password in the clear, and Pane says so when you choose it.</li>
+        <li><b>Amazon S3</b> and S3-compatible services are reached over HTTPS, with each request signed using your keys. Your secret key is never sent itself.</li>
+        <li>Pane uses the tools that come with macOS (<code>sftp</code>, <code>ssh-keyscan</code>, and <code>curl</code>) to talk to SFTP and FTP servers. They run on your Mac and send nothing anywhere but to the server.</li>
+        <li>Like any app, the server you connect to can see your internet address, and it follows its own privacy policy.</li>
+      </ul>
+
+      <h3>Files you open from a server</h3>
+      <p>When you open a file that lives on a server, Pane keeps a temporary copy in your Mac&rsquo;s temporary folder so the app can open it. Changes you save are sent back to the server. The copies are deleted when you quit Pane. If Pane stops without quitting, macOS clears that folder later.</p>
+
+      <h3>Full Disk Access</h3>
+      <p>macOS keeps some folders, such as Mail&rsquo;s data and parts of Library, closed to apps unless you allow <b>Full Disk Access</b>. Pane explains this the first time it cannot read a folder, and offers to open System Settings. It is your choice, and you can turn it off again there. With it, Pane can list those folders. Pane does not read, copy, or send them anywhere other than where you tell it to put a file.</p>
+
+      <h3>Other things worth knowing</h3>
+      <ul>
+        <li><b>Cloud folders.</b> Pane shows the iCloud Drive, Dropbox, Google Drive, and OneDrive folders those services keep on your Mac. Opening a file that is online only asks the service to download it. Pane does not log in to them.</li>
+        <li><b>Folder handler.</b> If you turn on <b>Use Pane to open folders</b>, Pane becomes the app macOS uses to show folders, and remembers what was set before so turning it off puts it back.</li>
+        <li><b>Global shortcut.</b> If you turn it on, Pane listens for that one key combination to open a new tab. It sees no other keys.</li>
+        <li>This web page loads nothing from other sites: no fonts, scripts, counters, or trackers. The web host may keep ordinary server logs, as web servers do. If you follow the Ko-fi link, Ko-fi&rsquo;s privacy policy applies there.</li>
+        <li>If macOS offers to send a crash report to Apple, that is your choice in macOS, and it goes to Apple, not to BradysBit.</li>
+        <li>If any of this changes, the new version will be on this page with a new date.</li>
+      </ul>
+
+      <h2>Terms</h2>
+      <ul>
+        <li><b>Pane is free and comes as is.</b> There is no promise that it will work for you or that it has no mistakes. Use it at your own risk. <b>Deleting, moving, and replacing files cannot always be undone, and a server has no Trash.</b> Keep copies of files you cannot lose, and try Pane on a test folder first.</li>
+        <li><b>Open source.</b> The source code is on <a href="https://github.com/michbrady/pane" rel="noopener">GitHub</a> under the MIT license, which has its own terms for using and sharing the code.</li>
+        <li><b>Other people&rsquo;s names.</b> Windows and File Explorer are trademarks of Microsoft, and Pane is not made by or connected to Microsoft. Finder, macOS, and Apple silicon belong to Apple. Amazon S3 belongs to Amazon. They have their own terms.</li>
+        <li><b>Tips are voluntary gifts.</b> A tip on Ko-fi is not a payment for anything and does not buy extra features or support.</li>
+        <li>You can stop using Pane at any time by deleting it. To remove your saved connections&rsquo; passwords too, remove each connection in Pane first.</li>
+      </ul>
+
+      <h2>Questions</h2>
+      <p>Questions about this page or about Pane? Reach BradysBit through its <a href="https://ko-fi.com/bradysbit" rel="noopener">Ko-fi page</a>.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>&copy; 2026 BradysBit.</b> Pane is a BradysBit app. <a href="./">Back to the Pane page</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
