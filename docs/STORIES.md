@@ -305,8 +305,8 @@ Acceptance:
 - [self] Rubber band selection works in Details and Icons.
 - [unit] Shift-click selects a range in sort order.
 - [self] Selection count shows in the status bar.
-Note: blocked on the rubber band. The Table already gives click, Command-click, Shift-click, and Command-A, and the Status bar shows the selection count and size. Drawing a box around items needs a custom table or grid, a larger change. Left as todo for a decision.
-Status: todo
+Note: Built, not yet seen working. Dragging on empty space draws a box and selects what it touches, with Command or Shift adding to the selection. Icons: a SwiftUI drag on the grid's background, so a drag that starts on an icon still drags the file. Details and List: a mouse monitor that starts a box only when the click lands below the last row of the list's table, selecting rows on the AppKit table. The rule (`RubberBand`) is unit-tested. Not verified: a real drag in either view, because the self-test cannot press the mouse. The Details version also depends on the SwiftUI Table following selection set on its AppKit table.
+Status: doing
 
 ## M4 Find and inspect
 

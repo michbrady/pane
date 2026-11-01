@@ -78,6 +78,7 @@ struct DetailsView: View {
             model.tab.open(Array(urls))
         }
         .alternatingRowBackgrounds(.disabled)
+        .background(DetailsRubberBand())
     }
 
     /// The folder an item is in, with the home folder written as "~".

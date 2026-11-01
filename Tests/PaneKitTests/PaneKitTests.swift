@@ -110,3 +110,15 @@ private func makeTree() throws -> URL {
     let remote = ContextMenuPlan(selectionCount: 1, hasFolder: true, isOnlyFolder: true, onServer: true, isPinned: false)
     #expect(remote.items == [.open, .openInNewTab], "a server offers no Terminal, pins, Open With, Properties, or Tags")
 }
+
+@Test func aBoxSelectsTheItemsItTouches() {
+    let frames: [(id: String, frame: CGRect)] = [("a", CGRect(x: 0, y: 0, width: 90, height: 90)), ("b", CGRect(x: 100, y: 0, width: 90, height: 90)),
+                                                 ("c", CGRect(x: 0, y: 100, width: 90, height: 90))]
+    let box = RubberBand.rect(from: CGPoint(x: 150, y: 50), to: CGPoint(x: 40, y: 120))
+    #expect(box == CGRect(x: 40, y: 50, width: 110, height: 70), "a box drawn up and to the left is the same box")
+    #expect(RubberBand.selection(in: box, frames: frames, base: [], additive: false) == ["a", "b", "c"])
+    #expect(RubberBand.selection(in: CGRect(x: 95, y: 10, width: 20, height: 20), frames: frames, base: ["a"], additive: false) == ["b"], "a plain drag replaces the selection")
+    #expect(RubberBand.selection(in: CGRect(x: 95, y: 10, width: 20, height: 20), frames: frames, base: ["a"], additive: true) == ["a", "b"], "Command or Shift adds to it")
+    #expect(RubberBand.selection(in: CGRect(x: 92, y: 92, width: 5, height: 5), frames: frames, base: [], additive: false).isEmpty, "a box in the gap touches nothing")
+    #expect(!RubberBand.isDrag(from: .zero, to: CGPoint(x: 2, y: 1)) && RubberBand.isDrag(from: .zero, to: CGPoint(x: 5, y: 0)))
+}

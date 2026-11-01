@@ -5,6 +5,9 @@ import PaneKit
 /// The Navigation pane is the left-most table, the list is the right-most. The Address bar is a field the model starts editing.
 @MainActor
 enum FocusMover {
+    /// The list's table: the right-most one in the window.
+    static func listTable(in window: NSWindow?) -> NSTableView? { tables(in: window).last }
+
     private static func tables(in window: NSWindow?) -> [NSTableView] {
         var found: [NSTableView] = []
         func walk(_ view: NSView) {

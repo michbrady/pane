@@ -119,13 +119,22 @@ struct IconGridView: View {
     @FocusState private var focused: Bool
     /// The item a Shift-click extends from.
     @State private var anchor: URL?
+    /// Where each cell is, for the box. Only cells that are on screen have one.
+    @State private var cellFrames: [URL: CGRect] = [:]
+    /// The box being dragged on empty space, and what was selected when the drag began.
+    @State private var box: CGRect?
+    @State private var boxStart: (point: CGPoint, base: Set<URL>, additive: Bool)?
 
     var body: some View {
         let tab = model.tab
+        GeometryReader { viewport in
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: Layout.iconCell), spacing: Space.sm, alignment: .top)], spacing: Space.sm) {
                 ForEach(tab.items) { item in
                     IconCell(item: item, isSelected: tab.selection.contains(item.url))
+                        .background(GeometryReader { cell in
+                            Color.clear.preference(key: CellFramesKey.self, value: [item.url: cell.frame(in: .named("icon-grid"))])
+                        })
                         .onTapGesture(count: 2) { tab.open([item.url]) }
                         .onTapGesture { select(item, in: tab) }
                         .draggable(item.url)
@@ -135,13 +144,54 @@ struct IconGridView: View {
                 }
             }
             .padding(Space.md)
+            // The content is at least as tall as the window, so empty space below the icons starts a box too.
+            .frame(maxWidth: .infinity, minHeight: viewport.size.height, alignment: .top)
+            .background {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { tab.selection = [] }
+                    .gesture(boxGesture(tab))
+            }
+            .overlay(alignment: .topLeading) {
+                if let box {
+                    Rectangle()
+                        .fill(Color.accentColor.opacity(0.18))
+                        .overlay(Rectangle().stroke(Color.accentColor, lineWidth: 1))
+                        .frame(width: box.width, height: box.height)
+                        .offset(x: box.minX, y: box.minY)
+                        .allowsHitTesting(false)
+                }
+            }
+            .coordinateSpace(name: "icon-grid")
+            .onPreferenceChange(CellFramesKey.self) { cellFrames = $0 }
         }
-        .contentShape(Rectangle())
-        .onTapGesture { tab.selection = [] }
+        }
         .focusable()
         .focusEffectDisabled()
         .focused($focused)
         .onChange(of: model.listFocusRequests) { focused = true }
+    }
+
+    /// Dragging on empty space draws a box and selects the icons it touches. Command or Shift adds to the selection.
+    private func boxGesture(_ tab: FolderTab) -> some Gesture {
+        DragGesture(minimumDistance: RubberBand.minimumDistance, coordinateSpace: .named("icon-grid"))
+            .onChanged { drag in
+                if boxStart == nil {
+                    // The keys are read now, in the event, not later.
+                    let keys = NSEvent.modifierFlags
+                    let additive = keys.contains(.command) || keys.contains(.shift)
+                    boxStart = (drag.startLocation, additive ? tab.selection : [], additive)
+                    focused = true
+                }
+                guard let start = boxStart else { return }
+                let area = RubberBand.rect(from: start.point, to: drag.location)
+                box = area
+                tab.selection = RubberBand.selection(in: area, frames: cellFrames.map { ($0.key, $0.value) }, base: start.base, additive: start.additive)
+            }
+            .onEnded { _ in
+                box = nil
+                boxStart = nil
+            }
     }
 
     /// Click selects one. Command-click adds or removes one. Shift-click selects from the last one clicked.
@@ -190,5 +240,13 @@ private struct IconCell: View {
                     in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
         .opacity(model.actions.isCut(item.url) ? Surfaces.cutOpacity : 1)
         .contentShape(Rectangle())
+    }
+}
+
+/// Where each icon cell is in the grid, collected so a dragged box can find the ones it touches.
+private struct CellFramesKey: PreferenceKey {
+    static let defaultValue: [URL: CGRect] = [:]
+    static func reduce(value: inout [URL: CGRect], nextValue: () -> [URL: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }
