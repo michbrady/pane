@@ -329,6 +329,58 @@ extension SelfTest {
         check("Delete removes them from the server", box.data(at: "/Inbox/big.bin") == nil && box.data(at: "/Inbox/keep.bin") == nil && !box.paths().contains("/Inbox/Reports"), "\(box.paths())")
         check("the list updates", model.tab.items.isEmpty, "\(model.tab.items.map(\.name))")
 
+        // S-066 Open and edit a file on a server (the app that opens it is faked)
+        box.add(file: "/Inbox/Notes.txt", contents: Data("first draft".utf8))
+        model.tab.go(to: place("/Inbox")); await settle()
+        let opened = Opened()
+        model.actions.openRemoteFile(place("/Inbox/Notes.txt"), open: { url in opened.url = url; return true })
+        await Wait.until(5) { opened.url != nil }
+        await idle()
+        let copy = opened.url
+        check("Return on a server file downloads it to a temporary folder and opens it",
+              copy?.lastPathComponent == "Notes.txt" && (try? String(contentsOf: copy!, encoding: .utf8)) == "first draft" && copy?.path.contains("Pane-remote-") == true,
+              "\(String(describing: copy))")
+        check("the temporary copy is not in a folder the person browses", !(copy?.path.hasPrefix(c.home.path) ?? true))
+        await model.actions.syncRemoteEdits()
+        check("nothing is sent before a save", box.data(at: "/Inbox/Notes.txt") == Data("first draft".utf8) && model.actions.statusMessage == nil)
+        if let copy {
+            try? Data("second draft".utf8).write(to: copy)
+            try? FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: copy.path)
+        }
+        await model.actions.syncRemoteEdits()
+        check("saving in the app sends the change to the server", box.data(at: "/Inbox/Notes.txt") == Data("second draft".utf8))
+        check("and the Status bar says Uploaded Notes.txt", model.actions.statusMessage == "Uploaded Notes.txt", model.actions.statusMessage ?? "nil")
+
+        box.add(file: "/Inbox/Notes.txt", contents: Data("edited by someone else".utf8))
+        if let copy {
+            try? Data("my third draft".utf8).write(to: copy)
+            try? FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(10)], ofItemAtPath: copy.path)
+        }
+        await model.actions.syncRemoteEdits()
+        check("a file that changed on the server asks before it overwrites it",
+              model.actions.pendingEditConflict?.name == "Notes.txt" && box.data(at: "/Inbox/Notes.txt") == Data("edited by someone else".utf8))
+        model.actions.resolveEditConflict(replace: false)
+        await model.actions.syncRemoteEdits()
+        check("Not Now leaves both, and does not ask again until the next save",
+              model.actions.pendingEditConflict == nil && box.data(at: "/Inbox/Notes.txt") == Data("edited by someone else".utf8))
+        if let copy {
+            try? Data("my fourth draft".utf8).write(to: copy)
+            try? FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(15)], ofItemAtPath: copy.path)
+        }
+        await model.actions.syncRemoteEdits()
+        check("the next save asks again", model.actions.pendingEditConflict != nil)
+        model.actions.resolveEditConflict(replace: true)
+        await idle()
+        check("Replace puts the person's version on the server", box.data(at: "/Inbox/Notes.txt") == Data("my fourth draft".utf8), String(describing: box.data(at: "/Inbox/Notes.txt").map { String(decoding: $0, as: UTF8.self) }))
+
+        let folderOfCopy = copy?.deletingLastPathComponent().deletingLastPathComponent()
+        model.actions.discardRemoteEditsForTest()
+        check("the temporary copies are deleted", folderOfCopy.map { !FileManager.default.fileExists(atPath: $0.path) } ?? false && !model.actions.remoteEditCopiesExist)
+        model.actions.openRemoteFile(place("/Inbox/missing.txt"), open: { _ in true })
+        await idle()
+        check("a file that is gone says so, and opens nothing", model.actions.alertMessage != nil)
+        model.actions.alertMessage = nil
+
         model.disconnect(serverKey: "sftp://xfer")
         await settle()
         model.tab.go(to: c.docs)
@@ -372,6 +424,10 @@ private struct ScriptedSFTP: ProcessRunner {
             return ProcessResult(stdout: "sftp> ls\ndrwxr-xr-x 2 1 1 4096 Oct 30 09:15 My Docs\n-rw-r--r-- 1 1 1 5 Oct 30 09:15 notes.txt\n", stderr: "", status: 0)
         }
     }
+}
+
+private final class Opened {
+    var url: URL?
 }
 
 private final class S3Log {

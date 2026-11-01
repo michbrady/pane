@@ -545,7 +545,8 @@ Acceptance:
 - [self] Saving in that app uploads the change, and the Status bar says "Uploaded Notes.txt".
 - [self] A changed file on the server since download asks before it overwrites.
 - [unit] Temporary copies are deleted when Pane quits.
-Status: todo
+Note: Return (or a double-click) on a server file downloads it to a temporary folder, with the progress sheet after a second, and opens it in its default app. Pane looks at the copy every second and a half. A save is sent back and the Status bar says "Uploaded Notes.txt". If the server's copy changed after the file was opened, Pane asks "changed on the server" with Replace or Not Now, and never overwrites without asking. Not Now leaves both and asks again only after the next save. Quitting first sends any saved change, warns if one could not be sent, then deletes the temporary copies (a crash leaves them in the system temporary folder, which macOS clears). Tested with a server in memory and a faked app. [manual] A real app: TextEdit on a text file, Preview on a PDF, and an app that saves by replacing the file. A server that shows time only to the minute (SFTP, FTP) can miss a change made in the same minute and the same size.
+Status: done
 
 ### S-067 Save connections
 As the user, I save a server or bucket once and open it from the tree.

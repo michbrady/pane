@@ -1211,3 +1211,70 @@ private struct ListingStub: S3Transport {
     #expect(config.contains("quote = \"-RNFR a.txt\"") && config.contains("quote = \"-RNTO b.txt\"") && config.contains("url = \"ftp://h/Docs/\""))
     await #expect(throws: RemoteError.self) { try await ftp.move(URL(string: "ftp://h/Docs/a.txt")!, to: URL(string: "ftp://h/Other/a.txt")!) }
 }
+
+// MARK: Open and edit a file on a server (S-066)
+
+private func editSetup() -> (RemoteEdits, InMemoryRemote, URL) {
+    let router = FileSystemRouter()
+    let nas = InMemoryRemote(serverKey: "sftp://nas")
+    router.register(nas)
+    nas.add(folder: "/Docs"); nas.add(file: "/Docs/Notes.txt", contents: Data("first".utf8))
+    let root = scratchFolder().appending(path: "edits")
+    return (RemoteEdits(router: router, root: root), nas, root)
+}
+
+private func save(_ text: String, to file: URL) throws {
+    try Data(text.utf8).write(to: file)
+    // A save a moment later: make sure the time moved even on a fast disk.
+    try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: file.path)
+}
+
+@Test func openingDownloadsATemporaryCopyThatSavesGoBackFrom() async throws {
+    let (edits, nas, root) = editSetup()
+    let local = try await edits.open(serverURL("/Docs/Notes.txt"), progress: { _ in })
+    #expect(local.lastPathComponent == "Notes.txt" && local.path.hasPrefix(root.path))
+    #expect(try String(contentsOf: local, encoding: .utf8) == "first")
+    #expect(edits.changed().isEmpty, "nothing to send before a save")
+    try save("second", to: local)
+    let session = try #require(edits.changed().first)
+    #expect(try await edits.sync(session.id) == .uploaded)
+    #expect(nas.data(at: "/Docs/Notes.txt") == Data("second".utf8))
+    #expect(edits.changed().isEmpty)
+    let again = try await edits.sync(session.id)
+    #expect(again == .unchanged)
+    try save("third", to: local)
+    let third = try await edits.sync(session.id)
+    #expect(third == .uploaded && nas.data(at: "/Docs/Notes.txt") == Data("third".utf8), "later saves go back too")
+}
+
+@Test func aFileChangedOnTheServerIsNeverOverwrittenWithoutAsking() async throws {
+    let (edits, nas, _) = editSetup()
+    let local = try await edits.open(serverURL("/Docs/Notes.txt"), progress: { _ in })
+    nas.add(file: "/Docs/Notes.txt", contents: Data("someone else was here".utf8))
+    try save("mine", to: local)
+    let session = try #require(edits.changed().first)
+    #expect(try await edits.sync(session.id) == .serverChanged)
+    #expect(nas.data(at: "/Docs/Notes.txt") == Data("someone else was here".utf8), "nothing was sent")
+    edits.hold(session.id)
+    #expect(edits.changed().isEmpty, "Not Now does not ask again until the next save")
+    try save("mine, again", to: local)
+    #expect(edits.changed().count == 1)
+    #expect(try await edits.sync(session.id, replacing: true) == .uploaded)
+    #expect(nas.data(at: "/Docs/Notes.txt") == Data("mine, again".utf8))
+}
+
+@Test func temporaryCopiesAreDeletedWhenPaneQuits() async throws {
+    let (edits, _, root) = editSetup()
+    _ = try await edits.open(serverURL("/Docs/Notes.txt"), progress: { _ in })
+    #expect(FileManager.default.fileExists(atPath: root.path))
+    edits.discardAll()
+    #expect(!FileManager.default.fileExists(atPath: root.path) && edits.isEmpty)
+}
+
+@Test func aFailedDownloadLeavesNoTemporaryFolder() async throws {
+    let (edits, nas, root) = editSetup()
+    nas.add(file: "/Docs/big.bin", contents: Data(repeating: 1, count: 3000))
+    nas.failTransfers(of: ["/Docs/big.bin"])
+    await #expect(throws: RemoteError.connectionLost) { _ = try await edits.open(serverURL("/Docs/big.bin"), progress: { _ in }) }
+    #expect(((try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []).isEmpty && edits.isEmpty)
+}

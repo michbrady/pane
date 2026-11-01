@@ -7,7 +7,7 @@ struct StatusBar: View {
 
     var body: some View {
         HStack {
-            Text(summary)
+            Text(model.actions.statusMessage ?? summary)
                 .font(.callout)
                 .foregroundStyle(.secondary)
             Spacer()

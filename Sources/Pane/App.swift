@@ -152,6 +152,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// Quitting first sends what was saved to files opened from a server, and removes their temporary copies.
+    var quitWork: (() async -> Bool)?
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // Test and snapshot runs quit from inside a task that holds the main actor, so they cannot wait for a reply.
+        guard !Locations.isOverridden, let quitWork else { return .terminateNow }
+        Task { @MainActor in NSApp.reply(toApplicationShouldTerminate: await quitWork()) }
+        return .terminateLater
+    }
+
     /// The self-test's result becomes the exit code, after a normal quit.
     func applicationWillTerminate(_ notification: Notification) {
         if SelfTest.requested { exit(SelfTest.exitCode) }

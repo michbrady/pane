@@ -91,6 +91,7 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
     private var lost = false
     private var listDelay: Duration = .zero
     private var contents: [String: Data] = [:]
+    private var modifiedAt: [String: Date] = [:]
     private var transferDelay: Duration = .zero
     private var failing: Set<String> = []
 
@@ -108,7 +109,7 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
     /// A file with real bytes, so a download can be compared byte for byte.
     public func add(file path: String, contents data: Data) {
         inner.add(file: path, size: Int64(data.count))
-        lock.withLock { contents[path] = data }
+        lock.withLock { contents[path] = data; modifiedAt[path] = Date() }
     }
 
     /// The bytes of a file on the server, or nil.
@@ -147,9 +148,10 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
         if delay != .zero { try await Task.sleep(for: delay) }
         guard !isLost else { throw RemoteError.connectionLost }
         let listed = try await inner.list(innerURL(folder))
+        let dates = lock.withLock { modifiedAt }
         // The in-memory file system keeps a /.Trash folder. A server does not show one.
         return listed.filter { !$0.name.hasPrefix(".") }.map {
-            FolderItem(url: outerURL($0.url, like: folder), name: $0.name, isFolder: $0.isFolder, size: $0.size, modified: $0.modified,
+            FolderItem(url: outerURL($0.url, like: folder), name: $0.name, isFolder: $0.isFolder, size: $0.size, modified: $0.modified ?? dates[$0.url.path],
                        kind: FolderItem.kind(forFileNamed: $0.name, isFolder: $0.isFolder))
         }
     }
@@ -162,7 +164,9 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
         lock.withLock {
             for key in contents.keys where key == from || key.hasPrefix(from + "/") {
                 contents[to + key.dropFirst(from.count)] = contents[key]
+                modifiedAt[to + key.dropFirst(from.count)] = modifiedAt[key]
                 contents[key] = nil
+                modifiedAt[key] = nil
             }
         }
     }

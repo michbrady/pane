@@ -38,6 +38,21 @@ final class FileActions {
     /// The servers that are connected. AppModel sets it, so a paste can reach them.
     var router = FileSystemRouter()
     private var transfers: TransferOperations { TransferOperations(router: router) }
+
+    // Open and edit a file on a server (S-066)
+    @ObservationIgnored private var editsStore: RemoteEdits?
+    private var edits: RemoteEdits {
+        if let editsStore { return editsStore }
+        let made = RemoteEdits(router: router, root: FileManager.default.temporaryDirectory.appending(path: "Pane-remote-\(UUID().uuidString)", directoryHint: .isDirectory))
+        editsStore = made
+        return made
+    }
+    /// A short note for the Status bar, like "Uploaded Notes.txt". It clears itself.
+    private(set) var statusMessage: String?
+    /// A saved file whose server copy changed since it was opened, waiting for the person's choice.
+    private(set) var pendingEditConflict: (id: UUID, name: String)?
+    private var isSyncingEdits = false
+    @ObservationIgnored private var syncTask: Task<Void, Never>?
     private(set) var progressVisible = false
     private var operationTask: Task<Void, Never>?
     /// Rename, New Folder, Undo, and Redo run in the background without `operationTask`.
@@ -219,6 +234,121 @@ final class FileActions {
         } finished: { result in
             if result.failures.isEmpty { open(url) }
             return result
+        }
+    }
+
+    // MARK: Open and edit a file on a server
+
+    /// Downloads the file to a temporary folder, with the progress sheet after a second, then opens it.
+    /// Saves made in that app go back to the server. `open` is a parameter so tests do not launch an app.
+    func openRemoteFile(_ url: URL, open: @escaping @MainActor (URL) -> Bool = { NSWorkspace.shared.open($0) }) {
+        guard operationTask == nil else { return }
+        let name = RemoteURL.name(of: url)
+        let size = tab.items.first { $0.url == url }?.size ?? 0
+        var copy: URL?
+        run(title: "Downloading") { [self] in
+            var result = OperationResult(record: OperationRecord(name: "Open", steps: []))
+            do {
+                copy = try await edits.open(url, progress: { bytes in
+                    Task { @MainActor in self.noteProgress(OperationProgress(done: 0, total: 1, current: name, bytesDone: bytes, bytesTotal: size)) }
+                })
+            } catch is CancellationError {
+                result.wasCancelled = true
+            } catch {
+                result.failures.append(OperationFailure(url: url, message: error.localizedDescription))
+            }
+            return result
+        } finished: { [self] result in
+            if let copy, result.failures.isEmpty {
+                if !open(copy) { alertMessage = "No app can open \(name)." }
+                startSyncingEdits()
+            }
+            return result
+        }
+    }
+
+    /// Looks at the opened copies a couple of times a second. Tests call `syncRemoteEdits()` instead.
+    private func startSyncingEdits() {
+        guard syncTask == nil, !Locations.isOverridden else { return }
+        syncTask = Task { [self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(1500))
+                await syncRemoteEdits()
+            }
+        }
+    }
+
+    /// Sends back every copy that was saved. A file that changed on the server in the meantime asks first.
+    func syncRemoteEdits() async {
+        guard !isSyncingEdits, pendingEditConflict == nil else { return }
+        isSyncingEdits = true
+        defer { isSyncingEdits = false }
+        for session in edits.changed() {
+            do {
+                switch try await edits.sync(session.id) {
+                case .uploaded: say("Uploaded \(session.name)")
+                case .serverChanged:
+                    pendingEditConflict = (session.id, session.name)
+                    return
+                case .unchanged: break
+                }
+            } catch {
+                // Say so once. The next save tries again.
+                edits.hold(session.id)
+                alertMessage = "Unable to upload \(session.name). \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// Replace sends the person's version over the server's. Not Now leaves both, and asks again after the next save.
+    func resolveEditConflict(replace: Bool) {
+        guard let pending = pendingEditConflict else { return }
+        pendingEditConflict = nil
+        guard replace else { edits.hold(pending.id); return }
+        backgroundWork += 1
+        Task {
+            defer { backgroundWork -= 1 }
+            do {
+                if try await edits.sync(pending.id, replacing: true) == .uploaded { say("Uploaded \(pending.name)") }
+            } catch {
+                edits.hold(pending.id)
+                alertMessage = "Unable to upload \(pending.name). \(error.localizedDescription)"
+            }
+        }
+    }
+
+    /// For snapshots: the question a changed server file asks.
+    func showEditConflictForSnapshot(name: String) { pendingEditConflict = (UUID(), name) }
+    func hideEditConflictForSnapshot() { pendingEditConflict = nil; statusMessage = nil }
+    func showStatusForSnapshot(_ text: String) { statusMessage = text }
+
+    /// When Pane quits: send what was saved, and delete the temporary copies. False if the person chose to stay.
+    func finishRemoteEdits() async -> Bool {
+        guard editsStore != nil, !edits.isEmpty else { return true }
+        syncTask?.cancel()
+        await syncRemoteEdits()
+        let unsent = edits.changed()
+        if !unsent.isEmpty {
+            let alert = NSAlert()
+            alert.messageText = unsent.count == 1 ? "\u{201C}\(unsent[0].name)\u{201D} has changes that are not on the server." : "\(unsent.count) files have changes that are not on the server."
+            alert.informativeText = "If you quit now, those changes are lost."
+            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: "Quit Anyway")
+            if alert.runModal() == .alertFirstButtonReturn { return false }
+        }
+        edits.discardAll()
+        return true
+    }
+
+    /// Removes the temporary copies at once. For tests.
+    func discardRemoteEditsForTest() { edits.discardAll() }
+    var remoteEditCopiesExist: Bool { editsStore.map { !$0.isEmpty } ?? false }
+
+    private func say(_ text: String) {
+        statusMessage = text
+        Task {
+            try? await Task.sleep(for: .seconds(5))
+            if statusMessage == text { statusMessage = nil }
         }
     }
 

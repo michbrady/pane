@@ -44,6 +44,13 @@ struct ContentView: View {
         } message: {
             Text("This cannot be undone.")
         }
+        .alert("\u{201C}\(model.actions.pendingEditConflict?.name ?? "")\u{201D} changed on the server",
+               isPresented: .init(get: { model.actions.pendingEditConflict != nil }, set: { _ in })) {
+            Button("Replace", role: .destructive) { model.actions.resolveEditConflict(replace: true) }
+            Button("Not Now", role: .cancel) { model.actions.resolveEditConflict(replace: false) }
+        } message: {
+            Text("It changed after you opened it. Replace the server's version with yours?")
+        }
         .alert("Pane", isPresented: .init(get: { model.actions.alertMessage != nil }, set: { if !$0 { model.actions.alertMessage = nil } })) {
             Button("OK") {}
         } message: {
@@ -52,6 +59,7 @@ struct ContentView: View {
         .background(FrameAutosave(name: "PaneMain"))
         .task {
             AppDelegate.shared?.onOpen = { urls in model.openFromOutside(urls) }
+            AppDelegate.shared?.quitWork = { await model.actions.finishRemoteEdits() }
             SelfTest.runIfRequested(model: model)
             Snapshot.runIfRequested(model: model, openSettings: openSettings)
         }

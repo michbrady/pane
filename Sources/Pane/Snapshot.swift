@@ -13,12 +13,13 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, transfer, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", remoteDelete = "remote-delete", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, transfer, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", remoteDelete = "remote-delete", remoteEdit = "remote-edit", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
             model.cancelEditingAddress()
             model.actions.hideProgressForSnapshot()
+            model.actions.hideEditConflictForSnapshot()
             model.actions.hideConflictForSnapshot()
             model.actions.pendingDelete = nil
             model.actions.cancelRename()
@@ -131,13 +132,20 @@ enum Snapshot {
                 if self == .connectSFTPTrust {
                     model.connections.showTrustForSnapshot(host: "nas.local", fingerprint: "SHA256:7vQ2kXc0nR9aYtL3mH8dFhP1uJ4bWzE6sOiTgNxKqAw")
                 }
-            case .remote, .remoteLost, .remoteDelete:
+            case .remote, .remoteLost, .remoteDelete, .remoteEdit:
                 let nas = InMemoryRemote(serverKey: "sftp://nas")
                 for folder in ["/Photos", "/Documents", "/Documents/Taxes", "/Backups"] { nas.add(folder: folder) }
                 nas.add(file: "/Documents/Budget 2026.xlsx", size: 118_000); nas.add(file: "/Documents/Notes.txt", size: 2_400)
                 nas.add(file: "/Documents/Trip itinerary.pdf", size: 1_884_160)
                 model.connected(nas)
                 model.tab.go(to: RemoteURL.make(scheme: "sftp", host: "nas", path: "/Documents"))
+                if self == .remoteEdit {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(300))
+                        model.actions.showStatusForSnapshot("Uploaded Notes.txt")
+                        model.actions.showEditConflictForSnapshot(name: "Notes.txt")
+                    }
+                }
                 if self == .remoteDelete {
                     Task {
                         try? await Task.sleep(for: .milliseconds(300))
@@ -225,7 +233,12 @@ enum Snapshot {
                 }
             }
             print("SNAPSHOT done \(dir)")
-            // An open sheet refuses terminate, and the run would wait forever.
+            // An open sheet or alert refuses terminate, and the run would wait forever.
+            model.actions.hideEditConflictForSnapshot()
+            model.actions.hideConflictForSnapshot()
+            model.actions.hideProgressForSnapshot()
+            model.actions.pendingDelete = nil
+            try? await Task.sleep(for: .milliseconds(300))
             for window in NSApp.windows { if let sheet = window.attachedSheet { window.endSheet(sheet) } }
             NSApp.terminate(nil)
         }

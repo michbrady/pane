@@ -91,3 +91,9 @@ Symptom: found while planning New Folder on S3: `FileOperations.makeFolder` asks
 Cause: the server file systems answered `exists` with "listing it did not throw". S3 lists a name that is not there as an empty folder, so every name looked taken and the loop would never end.
 Fix: `exists` looks for the name in its parent's listing. A unit test lists an empty bucket and expects "not there".
 Rule: a question about one thing is answered by looking at that thing's own record, never by whether a broader call failed.
+
+## A quit hook that waits for a reply froze every snapshot run (S-066)
+Symptom: the snapshot run never ended. A sample showed the main thread inside `NSApp.terminate`, waiting.
+Cause: Quit now sends unsent saves first, so `applicationShouldTerminate` returns `.terminateLater` and replies from a main-actor task. Snapshot and self-test runs call `terminate` from a task that already holds the main actor, so the reply could never run.
+Fix: runs on the throwaway home (`Locations.isOverridden`) quit at once. A Quit from the menu still waits.
+Rule: anything that makes quitting asynchronous must be skipped by the test and snapshot runs, which quit from inside a task.

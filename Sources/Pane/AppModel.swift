@@ -119,7 +119,7 @@ final class AppModel {
         tab.spotlight = Locations.isOverridden ? nil : SystemSpotlight()
         tab.router = router
         actions.router = router
-        tab.requestRemoteOpen = { [unowned self] _ in actions.alertMessage = "Opening a file on a server comes in a later step. For now, browse it." }
+        tab.requestRemoteOpen = { [unowned self] url in actions.openRemoteFile(url) }
         tab.requestDownload = { [unowned self] url in actions.downloadAndOpen(url) }
         tab.didNavigate = { [unowned self, unowned tab] in
             // A tab in the background changes nothing outside itself.
