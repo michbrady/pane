@@ -601,7 +601,8 @@ As the user, I move focus between tree, list and address bar with F6.
 Depends: S-007
 Acceptance:
 - [self] F6 and Shift+F6 cycle focus. VoiceOver reads names, kinds and sizes.
-Status: todo
+Note: F6 and Shift+F6 (Go menu: Move Focus to Next/Previous Area) cycle the list, the Navigation pane, and the Address bar, which starts editing; the order is a pure rule in PaneKit with unit tests. Focus goes to the left-most table for the pane and the right-most for the list, found in the window. Each row is one VoiceOver element reading "name, kind, size". [manual] The real focus ring moving, and a VoiceOver pass: the self-test checks Pane's own decisions, because real focus belongs to the desktop. In Icons view, F6 to the list takes focus through the grid's own focus state.
+Status: done
 
 ## Dropped
 - Accounts, sharing, teams, sync servers, billing, analytics.

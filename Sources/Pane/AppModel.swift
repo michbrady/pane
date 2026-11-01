@@ -49,6 +49,10 @@ final class AppModel {
 
     // Address bar
     var isEditingAddress = false
+    /// Where F6 last put focus. The real focus wins when it can be read.
+    private(set) var focusRegion = FocusRegion.list
+    /// Counts F6 presses that landed in the list, so the Icons view can take focus.
+    private(set) var listFocusRequests = 0
     var addressText = ""
     /// The text that did not resolve. The error shows while the field still holds it.
     private(set) var addressFailedText: String?
@@ -193,6 +197,19 @@ final class AppModel {
         guard let saved = connections.saved.items.first(where: { $0.id == id }) else { return }
         if router.serverKeys.contains(saved.serverKey) { disconnect(serverKey: saved.serverKey) }
         connections.remove(id)
+    }
+
+    /// F6 and Shift+F6: focus moves list, Navigation pane, Address bar, and around.
+    func moveFocus(reverse: Bool = false) {
+        let here: FocusRegion = isEditingAddress ? .address : (FocusMover.current ?? focusRegion)
+        let next = FocusCycle.next(after: here, reverse: reverse, navigationShown: FocusMover.navigationShown)
+        focusRegion = next
+        if here == .address, next != .address { cancelEditingAddress() }
+        switch next {
+        case .address: beginEditingAddress()
+        case .navigation: FocusMover.focus(.navigation)
+        case .list: if !FocusMover.focus(.list) { listFocusRequests += 1 }
+        }
     }
 
     /// Return on the selection: opens it, or renames it when Settings says so. False when nothing is selected.

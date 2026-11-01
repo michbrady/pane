@@ -141,6 +141,7 @@ struct IconGridView: View {
         .focusable()
         .focusEffectDisabled()
         .focused($focused)
+        .onChange(of: model.listFocusRequests) { focused = true }
     }
 
     /// Click selects one. Command-click adds or removes one. Shift-click selects from the last one clicked.

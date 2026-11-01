@@ -77,3 +77,23 @@ private func makeTree() throws -> URL {
     #expect(Breadcrumbs.parent(of: URL(filePath: "/Users")) == URL(filePath: "/"))
     #expect(Breadcrumbs.parent(of: URL(filePath: "/")) == nil)
 }
+
+@Test func f6CyclesListNavigationAddressAndShiftF6GoesBack() {
+    #expect(FocusCycle.next(after: .list) == .navigation)
+    #expect(FocusCycle.next(after: .navigation) == .address)
+    #expect(FocusCycle.next(after: .address) == .list)
+    #expect(FocusCycle.next(after: .list, reverse: true) == .address)
+    #expect(FocusCycle.next(after: .address, reverse: true) == .navigation)
+    #expect(FocusCycle.next(after: .list, navigationShown: false) == .address)
+    #expect(FocusCycle.next(after: .address, reverse: true, navigationShown: false) == .list)
+}
+
+@Test func voiceOverReadsNameKindAndSize() {
+    let file = FolderItem(url: URL(fileURLWithPath: "/a/Budget.xlsx"), name: "Budget.xlsx", isFolder: false, size: 118_000, modified: nil, kind: "Excel Workbook")
+    #expect(ItemSpeech.label(for: file) == "Budget.xlsx, Excel Workbook, 118 KB")
+    #expect(ItemSpeech.label(for: file, showExtensions: false) == "Budget, Excel Workbook, 118 KB")
+    let folder = FolderItem(url: URL(fileURLWithPath: "/a/Work"), name: "Work", isFolder: true, size: nil, modified: nil, kind: "")
+    #expect(ItemSpeech.label(for: folder) == "Work, Folder")
+    let cloud = FolderItem(url: URL(fileURLWithPath: "/a/n.txt"), name: "n.txt", isFolder: false, size: 5, modified: nil, kind: "Text", isOnlineOnly: true)
+    #expect(ItemSpeech.label(for: cloud).hasSuffix("Online only"))
+}

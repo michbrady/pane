@@ -146,6 +146,9 @@ struct NameCell: View {
             }
         }
         .opacity(model.actions.isCut(item.url) ? Surfaces.cutOpacity : 1)
+        // VoiceOver reads the row as one thing: name, kind, and size.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(ItemSpeech.label(for: item, showExtensions: model.view.showExtensions))
     }
 }
 

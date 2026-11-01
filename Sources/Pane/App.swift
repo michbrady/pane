@@ -111,6 +111,10 @@ struct PaneApp: App {
                     .disabled(!model.tab.canGoUp)
                 Divider()
                 Button("Go to Address…") { model.beginEditingAddress() }
+                Button("Move Focus to Next Area") { model.moveFocus() }
+                    .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: [])
+                Button("Move Focus to Previous Area") { model.moveFocus(reverse: true) }
+                    .keyboardShortcut(KeyEquivalent("\u{F709}"), modifiers: .shift)
                     .keyboardShortcut("l")
                 Button("Connect to Server…") { model.connections.openConnectSheet() }
                     .keyboardShortcut("k")

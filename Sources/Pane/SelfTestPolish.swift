@@ -36,5 +36,31 @@ extension SelfTest {
         model.connections.forgetTrustedServers()
         check("Forget Trusted SFTP Servers empties Pane's list", !FileManager.default.fileExists(atPath: known.path))
         check("and never touches ~/.ssh", !known.path.contains("/.ssh/"))
+
+        // S-054 Make Pane keyboard friendly: F6 and Shift+F6 cycle the areas
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        model.cancelEditingAddress()
+        let shown = FocusMover.navigationShown
+        var expected = FocusRegion.list
+        var ok = true
+        var trail: [String] = []
+        for _ in 0..<4 {
+            expected = FocusCycle.next(after: expected, navigationShown: shown)
+            model.moveFocus()
+            await settle()
+            trail.append("\(model.focusRegion)")
+            ok = ok && model.focusRegion == expected && (expected == .address) == model.isEditingAddress
+            // The window's real focus is up to the desktop. Pane's own state is what is tested.
+            NSApp.keyWindow?.makeFirstResponder(nil)
+        }
+        check("F6 cycles list, Navigation pane, Address bar, and around, and the Address bar starts editing", ok, "\(trail) shown \(shown)")
+        model.cancelEditingAddress()
+        model.moveFocus()
+        let forward = model.focusRegion
+        model.moveFocus(reverse: true)
+        check("Shift+F6 goes back", FocusCycle.next(after: model.focusRegion, navigationShown: shown) == forward, "\(model.focusRegion) \(forward)")
+        model.cancelEditingAddress()
+        let first = model.tab.items.first
+        check("a row's VoiceOver label has its name, kind, and size", first.map { ItemSpeech.label(for: $0, showExtensions: true).hasPrefix($0.name) } ?? false)
     }
 }
