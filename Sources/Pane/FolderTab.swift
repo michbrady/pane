@@ -12,6 +12,9 @@ final class FolderTab: Identifiable {
     private(set) var items: [FolderItem] = []
     var selection: Set<URL> = []
     private(set) var loadError: String?
+    /// Why the folder cannot be shown: Pane may not read it, or it is gone (a drive or share was disconnected).
+    enum LoadProblem { case unreadable, unavailable }
+    private(set) var loadProblem: LoadProblem?
     private(set) var isLoading = false
     /// True once a load has taken more than half a second.
     private(set) var isSlow = false
@@ -213,6 +216,7 @@ final class FolderTab: Identifiable {
             case .success(let listed):
                 items = sorted(listed)
                 loadError = nil
+                loadProblem = nil
                 let still = Set(listed.map(\.url))
                 selection = selection.intersection(still)
                 // After Trash or delete, select the item that moved up. Wait for a listing
@@ -237,7 +241,9 @@ final class FolderTab: Identifiable {
                 }
             case .failure:
                 items = []
-                loadError = "Unable to read this folder."
+                // A folder that no longer exists, like one on a disconnected share, is not a permission problem.
+                loadProblem = FileManager.default.fileExists(atPath: folder.path) ? .unreadable : .unavailable
+                loadError = loadProblem == .unavailable ? "This folder is no longer available." : "Unable to read this folder."
             }
         }
     }

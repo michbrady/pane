@@ -51,7 +51,15 @@ struct FolderContent: View {
 
     @ViewBuilder
     private var stateOverlay: some View {
-        if let error = model.tab.loadError {
+        if model.tab.loadProblem == .unavailable {
+            ContentUnavailableView {
+                Label("This folder is no longer available", systemImage: "externaldrive.badge.xmark")
+            } description: {
+                Text("The drive or server it was on may have been disconnected.")
+            } actions: {
+                Button("Go to Home Folder") { model.tab.go(to: Locations.home) }
+            }
+        } else if let error = model.tab.loadError {
             ContentUnavailableView {
                 Label(error, systemImage: "lock.fill")
             } description: {

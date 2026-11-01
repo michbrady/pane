@@ -13,7 +13,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -110,6 +110,15 @@ enum Snapshot {
                 }
                 model.refreshVolumes()
                 model.tab.go(to: nas)
+            case .unavailable:
+                let gone = home.appending(path: "Volumes/Gone", directoryHint: .isDirectory)
+                try? FileManager.default.createDirectory(at: gone, withIntermediateDirectories: true)
+                model.tab.go(to: gone)
+                Task {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    try? FileManager.default.removeItem(at: gone)
+                    model.tab.reload()
+                }
             case .cloud:
                 model.refreshVolumes()
                 if let icloud = model.cloudRoots.first { model.tab.go(to: icloud.url) }

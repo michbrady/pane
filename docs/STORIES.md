@@ -433,9 +433,10 @@ As the user, I click the eject icon beside a share or drive in the tree to disco
 Depends: S-046
 Acceptance:
 - [self] The eject icon shows only for ejectable volumes and shares.
-- [self] A busy volume shows "Unable to eject. Items are in use." with a "Cancel" button.
+- [self] A busy volume shows "Unable to eject. Items are in use." in an alert with an OK button (a Cancel button would have nothing to cancel).
 - [self] A share that disappears leaves the tree and shows its folder as unavailable if it was open.
-Status: todo
+Note: the open folder of a vanished share shows "This folder is no longer available" with a way home, tested with a removed folder. The eject button itself and the busy-volume alert need a real drive or share [manual].
+Status: done
 
 ### S-048 Use cloud storage folders
 As the user, I see iCloud Drive, Dropbox, Google Drive and OneDrive in the tree and browse them like any folder.

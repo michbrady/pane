@@ -123,5 +123,34 @@ extension SelfTest {
               report.map { model.tab.items.contains($0) } == true)
         model.tab.go(to: c.docs)
         await settle()
+
+        // S-047 Disconnect a share or eject a drive
+        let temp = c.home.appending(path: "Volumes/Temp", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+        model.tab.go(to: temp)
+        await settle()
+        check("a folder that exists is shown normally", model.tab.loadProblem == nil && model.tab.loadError == nil)
+        try? FileManager.default.removeItem(at: temp)
+        model.tab.reload()
+        await settle()
+        check("a folder that went away says it is no longer available",
+              model.tab.loadProblem == .unavailable && model.tab.loadError == "This folder is no longer available.", model.tab.loadError ?? "nil")
+        model.tab.go(to: c.docs)
+        await settle()
+        check("going to a folder that exists clears the message", model.tab.loadProblem == nil)
+        let gone = c.home.appending(path: "Volumes/NAS2", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: gone, withIntermediateDirectories: true)
+        model.volumeSource = { [VolumeInfo(url: gone, name: "NAS2", isLocal: false, isEjectable: true)] }
+        model.refreshVolumes()
+        model.tab.go(to: gone)
+        await settle()
+        try? FileManager.default.removeItem(at: gone)
+        model.volumeSource = { [] }
+        model.refreshVolumes()
+        await settle()
+        check("a share that disappears leaves the tree and its open folder says so",
+              model.networkRoots.isEmpty && model.tab.loadProblem == .unavailable, "\(model.tab.loadProblem as Any)")
+        model.tab.go(to: c.docs)
+        await settle()
     }
 }

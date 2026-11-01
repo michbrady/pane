@@ -306,6 +306,8 @@ final class AppModel {
         let cloud = CloudLocations.list(home: Locations.home)
         Locations.cloudNames = Dictionary(uniqueKeysWithValues: cloud.map { ($0.url.path, $0.name) })
         cloudRoots = cloud.map { NavNode(url: $0.url, prefix: "cloud:", name: $0.name) }
+        // A tab showing a folder on a volume that just went away says so.
+        for tab in tabs where !FileManager.default.fileExists(atPath: tab.currentFolder.path) { tab.reload() }
         syncTree()
     }
 
