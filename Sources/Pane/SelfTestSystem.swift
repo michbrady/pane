@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import PaneKit
 
 /// Self-test: Pane and the rest of the Mac (S-040 to S-048): the Command bar, the folder-open
@@ -44,5 +45,25 @@ extension SelfTest {
         check("the screen shows when asked", model.showFullDiskAccessGuide)
         model.dismissFullDiskAccessGuide()
         check("Not Now closes it and it is not shown again", !model.showFullDiskAccessGuide && Prefs.defaults.bool(forKey: "pane.fdaGuideShown"))
+
+        // S-043 Open Pane with a global shortcut
+        let hotKey = GlobalHotKey.shared
+        check("the default shortcut is Control-Option-E", hotKey.shortcut == .default && hotKey.shortcut.displayText == "⌃⌥E")
+        let status = hotKey.register()
+        check("the system accepts the shortcut, or says another app has it",
+              status == noErr || status == OSStatus(eventHotKeyExistsErr), "status \(status)")
+        check("a refused shortcut says why", status == noErr || hotKey.problem?.contains("already used by another app") == true)
+        hotKey.unregister()
+        let tabsBefore = model.tabs.count
+        model.globalShortcutPressed()
+        check("pressing the shortcut opens a new tab at home", model.tabs.count == tabsBefore + 1 && model.tab.currentFolder.path == Locations.home.path)
+        model.close(model.tab)
+        let saved = hotKey.shortcut
+        hotKey.shortcut = Shortcut(keyCode: 1, modifiers: Shortcut.command | Shortcut.option)
+        check("the shortcut can be changed and is saved",
+              (try? JSONDecoder().decode(Shortcut.self, from: Prefs.defaults.data(forKey: "pane.globalShortcut") ?? Data())) == hotKey.shortcut)
+        hotKey.unregister()
+        hotKey.shortcut = saved
+        hotKey.unregister()
     }
 }

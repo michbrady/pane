@@ -24,6 +24,7 @@ struct SettingsView: View {
             switch tab {
             case .general: GeneralSettings()
             case .appearance: AppearanceSettings()
+            case .shortcuts: ShortcutSettings()
             }
         }
         .formStyle(.grouped)
@@ -34,7 +35,7 @@ struct SettingsView: View {
 
 /// The Settings tabs. Snapshot mode walks through every case.
 enum SettingsTab: String, CaseIterable, Identifiable {
-    case general, appearance
+    case general, appearance, shortcuts
 
     var id: String { rawValue }
 
@@ -42,6 +43,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: "General"
         case .appearance: "Appearance"
+        case .shortcuts: "Shortcuts"
         }
     }
 
@@ -49,6 +51,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: "gearshape"
         case .appearance: "paintpalette"
+        case .shortcuts: "keyboard"
         }
     }
 }
@@ -74,4 +77,32 @@ struct GeneralSettings: View {
             }
         }
     }
+}
+
+struct ShortcutSettings: View {
+    var body: some View {
+        @Bindable var hotKey = GlobalHotKey.shared
+        Section("Open Pane from anywhere") {
+            Toggle("Use a shortcut to open a new tab in Pane", isOn: $hotKey.isEnabled)
+            LabeledContent("Shortcut") { ShortcutRecorder(hotKey: hotKey) }
+                .disabled(!hotKey.isEnabled)
+            if let problem = hotKey.problem {
+                Label(problem, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red).font(.callout)
+            } else {
+                Text("Pane has to be running. The shortcut brings it forward with a new tab.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        Section("In Pane") {
+            ForEach(Self.keys, id: \.0) { key in
+                LabeledContent(key.0) { Text(key.1).foregroundStyle(.secondary) }
+            }
+        }
+    }
+
+    private static let keys: [(String, String)] = [
+        ("Rename", "F2"), ("Open", "Return or ⌘↓"), ("Search", "F3 or ⌘F"), ("Edit the address", "F4 or ⌘L"),
+        ("Move to Trash", "Delete or ⌘Delete"), ("Cut, Copy, Paste", "⌘X, ⌘C, ⌘V"),
+        ("New tab", "⌘T"), ("Go to tab", "⌘1 to ⌘9"), ("Preview pane", "⇧⌘P"),
+    ]
 }

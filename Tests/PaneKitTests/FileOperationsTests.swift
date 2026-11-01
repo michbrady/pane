@@ -449,6 +449,25 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(!FullDiskAccessGuide.reason.contains("\n"))
 }
 
+@Test func theDefaultShortcutIsControlOptionE() {
+    #expect(Shortcut.default.displayText == "⌃⌥E")
+    #expect(Shortcut.default.isValid)
+}
+
+@Test func aGlobalShortcutNeedsACommandOptionOrControlKey() {
+    #expect(!Shortcut(keyCode: 14, modifiers: 0).isValid)
+    #expect(!Shortcut(keyCode: 14, modifiers: Shortcut.shift).isValid)
+    #expect(Shortcut(keyCode: 14, modifiers: Shortcut.command | Shortcut.shift).isValid)
+    #expect(!Shortcut(keyCode: 9999, modifiers: Shortcut.command).isValid)
+}
+
+@Test func shortcutsReadInTheMacOrderAndSurviveSaving() throws {
+    let shortcut = Shortcut(keyCode: 1, modifiers: Shortcut.command | Shortcut.shift | Shortcut.option | Shortcut.control)
+    #expect(shortcut.displayText == "⌃⌥⇧⌘S")
+    let decoded = try JSONDecoder().decode(Shortcut.self, from: JSONEncoder().encode(shortcut))
+    #expect(decoded == shortcut)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

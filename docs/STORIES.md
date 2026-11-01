@@ -402,7 +402,8 @@ Depends: S-001
 Acceptance:
 - [self] The shortcut works with Pane in the background.
 - [self] It can be changed in Settings.
-Status: todo
+Note: it brings Pane forward with a new tab at the home folder, not a separate window (docs/DESIGN.md puts folders in tabs). Registration and the "another app already has it" message are tested. Press the real shortcut from another app by hand [manual]. Pane has to be running: closing the last window quits it.
+Status: done
 
 ### S-044 Browse network and iCloud
 As the user, I see mounted SMB shares, iCloud Drive and external drives in the tree.

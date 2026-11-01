@@ -85,6 +85,8 @@ final class AppModel {
         activeIndex = active
         for tab in tabs { tab.begin() }
         activated()
+        GlobalHotKey.shared.onPress = { [unowned self] in globalShortcutPressed() }
+        GlobalHotKey.shared.start()
         // Tests and snapshots never ask. A person gets the screen once, if Pane lacks access.
         if !Locations.isOverridden {
             showFullDiskAccessGuide = FullDiskAccessGuide.shouldShow(
@@ -158,6 +160,14 @@ final class AppModel {
     /// Cut and Copy work on a selection, or on the text in the Address bar.
     var canCopy: Bool { !tab.selection.isEmpty || isEditingAddress }
 
+
+    // MARK: Global shortcut
+
+    /// The shortcut was pressed in any app: bring Pane forward with a new tab at the home folder.
+    func globalShortcutPressed() {
+        NSApp.activate()
+        newTab(at: Locations.home)
+    }
 
     // MARK: Terminal
 
