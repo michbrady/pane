@@ -34,6 +34,10 @@ final class FileActions {
     private(set) var progressTitle = ""
     private(set) var progressVisible = false
     private var operationTask: Task<Void, Never>?
+    /// Rename, New Folder, Undo, and Redo run in the background without `operationTask`.
+    private var backgroundWork = 0
+    /// True while a file operation or a background change is still running.
+    var isBusy: Bool { operationTask != nil || backgroundWork > 0 }
     /// A name conflict waiting for the person's choice.
     private(set) var pendingConflict: PendingConflict?
     /// Items waiting for the person to confirm Delete Immediately.
@@ -223,7 +227,9 @@ final class FileActions {
         guard let url = renamingURL, let item = tab.items.first(where: { $0.url == url }) else { return }
         if renameText == item.name { cancelRename(); return }
         let text = renameText
+        backgroundWork += 1
         Task {
+            defer { backgroundWork -= 1 }
             do {
                 let record = try await operations.rename(url, to: text)
                 renamingURL = nil
@@ -249,7 +255,9 @@ final class FileActions {
     func newFolder() {
         guard editingText == nil, operationTask == nil else { return }
         let folder = tab.currentFolder
+        backgroundWork += 1
         Task {
+            defer { backgroundWork -= 1 }
             do {
                 let (url, record) = try await operations.makeFolder(in: folder)
                 remember(record)
@@ -293,7 +301,9 @@ final class FileActions {
         // Registered while undoing, so it becomes the Redo.
         undoManager.registerUndo(withTarget: self) { model in model.performRedo(box) }
         undoManager.setActionName(box.record.name)
+        backgroundWork += 1
         Task {
+            defer { backgroundWork -= 1 }
             do { try await operations.undo(box.record) } catch { alertMessage = "Unable to undo. \(error.localizedDescription)" }
             tab.reload()
         }
@@ -302,7 +312,9 @@ final class FileActions {
     private func performRedo(_ box: RecordBox) {
         undoManager.registerUndo(withTarget: self) { model in model.performUndo(box) }
         undoManager.setActionName(box.record.name)
+        backgroundWork += 1
         Task {
+            defer { backgroundWork -= 1 }
             do { box.record = try await operations.redo(box.record) } catch { alertMessage = "Unable to redo. \(error.localizedDescription)" }
             tab.reload()
         }

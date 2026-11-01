@@ -43,8 +43,15 @@ Cause: the pane showed a spinner while the image was nil, and nil also meant "lo
 Fix: a `failed` flag, set when loading ends with nothing, shows the file's icon instead.
 Rule: a loading state needs an end state for failure. Never use "no value yet" to mean both "loading" and "gave up".
 
-## "Space closes Quick Look" failed once in a full run (S-030 run)
-Symptom: one self-test check failed in one run and passed in the others.
-Cause: the preview panel closes with a short animation, and the check looked 0.5 seconds after.
-Fix: the panel closes with `close()`, and the check waits up to two seconds for it to hide.
-Rule: wait for a UI state with a bounded poll. Never sleep a fixed time and then read it.
+## Quick Look's visibility is up to the desktop, so a check on it was flaky (S-032)
+Symptom: "Space closes Quick Look" failed in some full runs and passed in others, and failed every time once the test tried to activate the app.
+Cause: macOS hides a panel while its app is not in front, and refuses to bring a background app forward on request. The check read `panel.isVisible`, which depends on what the desktop is doing.
+Fix: `QuickLookController.isShown` tracks whether Pane opened the panel, and clears when the panel closes. The check tests that, and the real panel is tried by hand.
+Rule: in the self-test, check what Pane decided, not whether macOS drew a window. Leave on-screen behavior to the hand-test list.
+
+## Self-test runs overlapped and corrupted each other (S-030 run)
+Symptom: occasional runs stalled or failed from the conflict section on, while the next run passed.
+Cause: a run started while an earlier Pane was still shutting down, and both used the same throwaway folder and settings.
+Fix: `tools/selftest.sh` waits for any running Pane to exit before it starts.
+Rule: run the self-test one at a time. Never start a second run while one may still be going.
+

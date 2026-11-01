@@ -148,7 +148,7 @@ final class AppModel {
     func toggleQuickLook() {
         let controller = QuickLookController.shared
         controller.model = self
-        if controller.isVisible {
+        if controller.isShown {
             controller.close()
         } else {
             controller.show(tab.selectedItems.map(\.url))

@@ -9,7 +9,11 @@ final class QuickLookController: NSObject, @preconcurrency QLPreviewPanelDataSou
     weak var model: AppModel?
     private(set) var urls: [URL] = []
 
-    var isVisible: Bool { QLPreviewPanel.shared()?.isVisible ?? false }
+    /// True from when Pane opens the panel until it closes, by Space, Escape, or its own close button.
+    /// It follows what Pane did, not whether macOS has the panel on screen: an app that is not in
+    /// front has its panels hidden by the system, and the panel comes back with the app.
+    private(set) var isShown = false
+    private var closeObserver: NSObjectProtocol?
 
     func show(_ urls: [URL]) {
         guard !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
@@ -18,16 +22,24 @@ final class QuickLookController: NSObject, @preconcurrency QLPreviewPanelDataSou
         panel.delegate = self
         panel.reloadData()
         panel.makeKeyAndOrderFront(nil)
+        isShown = true
+        if closeObserver == nil {
+            closeObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.willCloseNotification, object: panel, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.isShown = false }
+            }
+        }
     }
 
     /// The selection changed while the panel is open: show the new items.
     func update(_ urls: [URL]) {
-        guard isVisible, !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
+        guard isShown, !urls.isEmpty, let panel = QLPreviewPanel.shared() else { return }
         self.urls = urls
         panel.reloadData()
     }
 
     func close() {
+        isShown = false
         QLPreviewPanel.shared()?.close()
     }
 

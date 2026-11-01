@@ -32,7 +32,7 @@ struct FolderContent: View {
             return .handled
         }
         .onKeyPress(.space) {
-            guard !model.tab.selection.isEmpty || QuickLookController.shared.isVisible else { return .ignored }
+            guard !model.tab.selection.isEmpty || QuickLookController.shared.isShown else { return .ignored }
             model.toggleQuickLook()
             return .handled
         }
