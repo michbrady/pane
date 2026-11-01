@@ -46,6 +46,24 @@ final class Places {
     }
 
     /// Lists the connected servers again.
+    /// Bumped whenever the tree should be read again, so its rows draw again.
+    private(set) var treeRevision = 0
+
+    /// A folder on this Mac changed: its row lists its subfolders again.
+    func folderChanged(_ folder: URL) {
+        let path = folder.resolvingSymlinksInPath().path
+        for root in allRoots { root.invalidate(folderAt: path) }
+        treeRevision += 1
+    }
+
+    /// Something changed in more than one folder, like a drop into a folder in the tree or an Undo: read all of it again.
+    func refreshTree() {
+        for root in allRoots { root.invalidateAll() }
+        treeRevision += 1
+    }
+
+    private var allRoots: [NavNode] { quickRoots + [homeRoot] + driveRoots + networkRoots + cloudRoots }
+
     func refreshConnections() {
         let connected = Set(serverKeys())
         let saved = savedConnections()

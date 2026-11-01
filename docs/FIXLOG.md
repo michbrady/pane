@@ -109,3 +109,9 @@ Symptom: a run sat inside the Remote section until the command timed out. A samp
 Cause: not found. `settle` has an 8 second limit, so it was not that wait alone. Not reproduced.
 Fix: none yet. If it comes back, sample the process before killing it and check for an open sheet or alert, which stops a quit.
 Rule: do not call a flake fixed when it was never seen again. Write down what was seen and keep the sample.
+
+## The Navigation pane never noticed a delete, a new folder, or a rename
+Symptom: after deleting or making a folder, the tree on the left kept showing the old list until Pane restarted.
+Cause: each tree row lists its subfolders once and keeps the list. Nothing told it to look again.
+Fix: after any listing of a folder on this Mac, and after any file operation, Undo, or Redo, the rows for the changed folders list again. Open rows stay open, because a row's id is its path. The check compares paths with links resolved, since /tmp and /private/tmp are one folder.
+Rule: a cached list needs a named event that clears it. When a cache is added, add the clear in the same change.

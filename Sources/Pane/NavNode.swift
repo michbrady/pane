@@ -45,6 +45,19 @@ final class NavNode: Identifiable {
         return cached
     }
 
+    /// Forgets the subfolders of the row for this folder, wherever it shows, so they are read again.
+    /// Rows already open stay open: a row's id is its path.
+    func invalidate(folderAt path: String) {
+        // Compared with links resolved: /tmp and /private/tmp are one folder.
+        if url.resolvingSymlinksInPath().path == path { invalidate(); return }
+        for child in cached ?? [] { child.invalidate(folderAt: path) }
+    }
+
+    /// Forgets every subfolder list below here.
+    func invalidateAll() {
+        invalidate()
+    }
+
     func invalidate() {
         loaded = false
         cached = nil

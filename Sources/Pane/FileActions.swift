@@ -24,6 +24,8 @@ final class FileActions {
     /// The tab these actions work on. AppModel sets it; with tabs it returns the active one.
     var tabProvider: () -> FolderTab = { fatalError("FileActions.tabProvider is not set") }
     private var tab: FolderTab { tabProvider() }
+    /// Something changed on disk that the Navigation pane may show. AppModel sets it.
+    var treeChanged: () -> Void = {}
 
     // File operations
     private(set) var clipboard = Clipboard()
@@ -189,7 +191,7 @@ final class FileActions {
             operationTask = nil
             report(result)
             remember(result.record)
-            tab.reload()
+            reloadFolder()
         }
     }
 
@@ -449,7 +451,7 @@ final class FileActions {
                 if !onServer { remember(record) }   // a server has no Trash to undo into
                 let renamed = url.deletingLastPathComponent().appending(path: text.trimmingCharacters(in: .whitespacesAndNewlines))
                 selectAfterReload(path: renamed.standardizedFileURL.path)
-                tab.reload()
+                reloadFolder()
             } catch let error as FileOperations.RenameError {
                 if fromBlur { cancelRename(); return }
                 switch error {
@@ -479,7 +481,7 @@ final class FileActions {
                     tab.selection = [item.url]
                     beginRename()
                 }
-                tab.reload()
+                reloadFolder()
             } catch {
                 alertMessage = "Unable to make a folder here. \(error.localizedDescription)"
             }
@@ -510,6 +512,12 @@ final class FileActions {
         undoManager.endUndoGrouping()
     }
 
+    /// Lists the folder again, and the tree with it: a delete, a new folder, a rename, or a move shows in the Navigation pane.
+    private func reloadFolder() {
+        tab.reload()
+        treeChanged()
+    }
+
     private func performUndo(_ box: RecordBox) {
         // Registered while undoing, so it becomes the Redo.
         undoManager.registerUndo(withTarget: self) { model in model.performRedo(box) }
@@ -518,7 +526,7 @@ final class FileActions {
         Task {
             defer { backgroundWork -= 1 }
             do { try await operations.undo(box.record) } catch { alertMessage = "Unable to undo. \(error.localizedDescription)" }
-            tab.reload()
+            reloadFolder()
         }
     }
 
@@ -529,7 +537,7 @@ final class FileActions {
         Task {
             defer { backgroundWork -= 1 }
             do { box.record = try await operations.redo(box.record) } catch { alertMessage = "Unable to redo. \(error.localizedDescription)" }
-            tab.reload()
+            reloadFolder()
         }
     }
 

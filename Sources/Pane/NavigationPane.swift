@@ -56,6 +56,8 @@ private struct NavRow: View {
     let node: NavNode
 
     var body: some View {
+        // Reading the revision makes this row draw again when the tree is read again.
+        let _ = model.places.treeRevision
         if let kids = node.children {
             DisclosureGroup(isExpanded: expansion) {
                 ForEach(kids) { NavRow(node: $0) }

@@ -21,6 +21,8 @@ final class FolderTab: Identifiable {
     var router = FileSystemRouter()
     /// Asked to open a file on a server. The app says what is not built yet.
     var requestRemoteOpen: ((URL) -> Void)?
+    /// Called with a folder on this Mac after it was listed, so the tree shows what is in it now.
+    var didList: ((URL) -> Void)?
     var isRemote: Bool { RemoteURL.isRemote(currentFolder) }
     private(set) var isLoading = false
     /// True once a load has taken more than half a second.
@@ -231,6 +233,7 @@ final class FolderTab: Identifiable {
             switch result {
             case .success(let listed):
                 items = sorted(listed)
+                if !RemoteURL.isRemote(folder) { didList?(folder) }
                 loadError = nil
                 loadProblem = nil
                 isStale = false

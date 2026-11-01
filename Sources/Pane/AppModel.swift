@@ -94,6 +94,7 @@ final class AppModel {
             // A tab showing a folder on a volume that just went away says so.
             for tab in tabs where !FileManager.default.fileExists(atPath: tab.currentFolder.path) { tab.reload() }
         }
+        actions.treeChanged = { [unowned self] in places.refreshTree() }
         places.alert = { [unowned self] message in actions.alertMessage = message }
         places.serverKeys = { [unowned self] in router.serverKeys }
         places.savedConnections = { [unowned self] in connections.saved.items }
@@ -123,6 +124,7 @@ final class AppModel {
         let tab = FolderTab(start: start, view: view)
         tab.spotlight = Locations.isOverridden ? nil : SystemSpotlight()
         tab.router = router
+        tab.didList = { [unowned self] folder in places.folderChanged(folder) }
         actions.router = router
         tab.requestRemoteOpen = { [unowned self] url in actions.openRemoteFile(url) }
         tab.requestDownload = { [unowned self] url in actions.downloadAndOpen(url) }

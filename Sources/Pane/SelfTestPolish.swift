@@ -91,5 +91,47 @@ extension SelfTest {
         await Wait.until { !model.actions.isBusy }
         await settle()
         check("and Undo brings it back", FileManager.default.fileExists(atPath: note.url.path))
+
+        // The Navigation pane follows changes: a new folder, a rename, and a delete show in the tree
+        // Read from the root each time: a row that was read again is a new row.
+        @MainActor func treeNames() -> [String] {
+            (model.places.homeRoot.children?.first { $0.name == "Documents" }?.children ?? []).map(\.name)
+        }
+        check("the tree lists the folders in Documents", treeNames().contains("Work"), "\(treeNames())")
+        model.tab.go(to: c.docs)
+        await settle()
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        model.actions.newFolder()
+        await Wait.until { !model.actions.isBusy }
+        await settle()
+        model.actions.cancelRename()
+        check("a new folder shows in the tree at once", treeNames().contains("New folder"), "\(treeNames())")
+        let made = model.tab.items.first { $0.name == "New folder" }
+        if let made {
+            model.tab.selection = [made.url]
+            model.actions.trashSelection()
+            await Wait.until { !model.actions.isBusy }
+            await settle()
+        }
+        check("a deleted folder leaves the tree", !treeNames().contains("New folder") && treeNames().contains("Work"), "\(treeNames())")
+        model.actions.undoManager.undo()
+        await Wait.until { !model.actions.isBusy }
+        await settle()
+        check("and Undo puts it back", treeNames().contains("New folder"), "\(treeNames())")
+        if let again = model.tab.items.first(where: { $0.name == "New folder" }) {
+            model.tab.selection = [again.url]
+            model.actions.trashSelection()
+            await Wait.until { !model.actions.isBusy }
+            await settle()
+        }
+        // A change made outside Pane, in the folder being shown, shows in the tree too
+        try? FileManager.default.createDirectory(at: c.docs.appending(path: "Made elsewhere"), withIntermediateDirectories: true)
+        model.tab.reload()
+        await Wait.until { treeNames().contains("Made elsewhere") }
+        check("a folder made by another app shows in the tree after the list updates", treeNames().contains("Made elsewhere"), "\(treeNames())")
+        try? FileManager.default.removeItem(at: c.docs.appending(path: "Made elsewhere"))
+        model.tab.reload()
+        await Wait.until { !treeNames().contains("Made elsewhere") }
+        check("and leaves it when it is removed", !treeNames().contains("Made elsewhere"))
     }
 }
