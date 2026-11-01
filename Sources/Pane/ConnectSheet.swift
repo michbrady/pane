@@ -35,6 +35,21 @@ struct ConnectSheet: View {
                     SecureField("Password", text: $password)
                         .onSubmit(connect)
                     Toggle("Remember this password in my Keychain", isOn: $remember)
+                case .ftp:
+                    Picker("Protocol", selection: $connections.ftpProtocol) {
+                        ForEach(Connections.FTPProtocol.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    TextField("Server", text: $host, prompt: Text("ftp.example.com"))
+                    TextField("Port", text: $port, prompt: Text("21"))
+                    TextField("User Name", text: $user)
+                    SecureField("Password", text: $password)
+                        .onSubmit(connect)
+                    Toggle("Remember this password in my Keychain", isOn: $remember)
+                    if let note = connections.ftpProtocol.note {
+                        Label(note, systemImage: "exclamationmark.triangle")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 case .sftp:
                     TextField("Server", text: $host, prompt: Text("nas.local"))
                     TextField("Port", text: $port, prompt: Text("22"))
@@ -120,6 +135,7 @@ struct ConnectSheet: View {
     private func connect() {
         switch model.connections.kind {
         case .share: model.connections.connect(address: address, user: user, password: password, remember: remember)
+        case .ftp: model.connections.connectFTP(host: host, port: port, user: user, password: password, protocol: model.connections.ftpProtocol, remember: remember)
         case .sftp: model.connections.connectSFTP(host: host, port: port, user: user, useKey: useKey, keyPath: keyPath, secret: password, remember: remember)
         case .s3: model.connections.connectS3(accessKey: accessKey, secretKey: password, region: region, endpoint: endpoint, remember: remember)
         }

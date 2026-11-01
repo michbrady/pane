@@ -79,3 +79,9 @@ Symptom: the S3 snapshot had gray traffic lights, no sidebar, and no sheet.
 Cause: a failed build left a snapshot run waiting, and a second run started on top of it. My `pkill` pattern needed an argument that snapshot runs do not have, so it killed nothing.
 Fix: find the old run with `pgrep -f Contents/MacOS/Pane`, end it, then start one run and read its fresh files.
 Rule: one snapshot or self-test run at a time. Check the build printed "Build complete" before running, and check the PNG is the key window before judging it.
+
+## The self-test failed once on "Rename lights up" and passed on the next run (S-061)
+Symptom: one failure in 243 checks, gone on a re-run, with no change near it.
+Cause: Rename and the edit keys step aside while a text field has focus, which is right for the app. The check assumed no field had focus, and the window's first responder is up to the desktop at launch.
+Fix: the check clears the first responder before it looks.
+Rule: a check about what the app decides must set up every input that decision reads, including which control has focus.

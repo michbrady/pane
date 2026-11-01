@@ -181,8 +181,42 @@ extension SelfTest {
         await Wait.until { !model.connections.isConnecting }
         check("a wrong password says Access denied. and saves nothing", model.connections.connectError == "Access denied." && sftpLog.saved == ["nas.local/me"])
         model.connections.closeConnectSheet()
+
+        // S-061 Connect to an FTP server (a script stands in for curl and the Keychain)
+        let ftpLog = S3Log()
+        model.connections.makeFTP = { host, port, user, password, secure in
+            FTPFileSystem(host: host, port: port, user: user, password: password, secure: secure, runner: ScriptedFTP(goodPassword: "ftp-pw"))
+        }
+        model.connections.saveFTPSecret = { _, server, account, secure in ftpLog.saved.append("\(secure ? "ftps" : "ftp")://\(server)/\(account)") }
+        model.connections.savedFTPSecret = { _, _, _ in nil }
+        check("FTP with TLS is the first choice", Connections.FTPProtocol.allCases.first == .tls && model.connections.ftpProtocol == .tls)
+        check("plain FTP says it sends the password without encryption", Connections.FTPProtocol.plain.note == "FTP sends your password without encryption.")
+        check("FTP with TLS shows no such note", Connections.FTPProtocol.tls.note == nil)
+        model.connections.openConnectSheet()
+        model.connections.connectFTP(host: "ftp.example.com", port: "", user: "me", password: "wrong", protocol: .tls, remember: true)
+        await Wait.until { !model.connections.isConnecting }
+        check("a wrong FTP password says Access denied. and saves nothing", model.connections.connectError == "Access denied." && ftpLog.saved.isEmpty)
+        model.connections.connectFTP(host: "ftp.example.com", port: "", user: "me", password: "", protocol: .tls, remember: false)
+        check("FTP asks for the password", model.connections.connectError == "Type the password.")
+        model.connections.connectFTP(host: "ftp.example.com", port: "2121", user: "me", password: "ftp-pw", protocol: .tls, remember: true)
+        await Wait.until { !model.connections.isConnecting && !model.connections.showConnectSheet }
+        await settle()
+        check("FTP with TLS connects, lists the top folder, and keeps the address", model.router.serverKeys == ["ftps://ftp.example.com:2121"] && model.tab.items.map(\.name) == ["Public", "readme.txt"],
+              "\(model.router.serverKeys) \(model.tab.items.map(\.name))")
+        check("Remember saves the password under the server and user", ftpLog.saved == ["ftps://ftp.example.com/me"], "\(ftpLog.saved)")
+        model.disconnect(serverKey: "ftps://ftp.example.com:2121")
+        await settle()
         model.tab.go(to: c.docs)
         await settle()
+    }
+}
+
+/// Answers like curl does for one pretend FTP server, with a Windows-style listing.
+private struct ScriptedFTP: ProcessRunner {
+    let goodPassword: String
+    func run(_ executable: String, _ arguments: [String], input: String, environment: [String: String]) async throws -> ProcessResult {
+        guard input.contains(":\(goodPassword)\"") else { return ProcessResult(stdout: "", stderr: "curl: (67) Access denied: 530", status: 67) }
+        return ProcessResult(stdout: "10-30-26  09:15AM       <DIR>          Public\n10-30-26  09:15AM                 204 readme.txt\n", stderr: "", status: 0)
     }
 }
 

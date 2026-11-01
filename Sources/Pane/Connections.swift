@@ -10,10 +10,18 @@ final class Connections {
 
     /// What the sheet connects to. More join as they are built.
     enum Kind: String, CaseIterable, Identifiable {
-        case share = "File Share (SMB)", sftp = "SFTP", s3 = "Amazon S3"
+        case share = "File Share (SMB)", ftp = "FTP", sftp = "SFTP", s3 = "Amazon S3"
         var id: String { rawValue }
     }
     var kind = Kind.share
+
+    /// FTP with TLS comes first: it hides the password. Plain FTP says what it gives up.
+    enum FTPProtocol: String, CaseIterable, Identifiable {
+        case tls = "FTP with TLS", plain = "FTP"
+        var id: String { rawValue }
+        var note: String? { self == .plain ? "FTP sends your password without encryption." : nil }
+    }
+    var ftpProtocol = FTPProtocol.tls
     private(set) var isConnecting = false
     private(set) var connectError: String?
     private(set) var recentServers = RecentServers(Prefs.defaults.stringArray(forKey: "pane.recentServers") ?? [])
@@ -46,6 +54,16 @@ final class Connections {
     private(set) var pendingTrust: PendingTrust?
     private var resumeAfterTrust: (() -> Void)?
     private var trustServer: SFTPFileSystem?
+
+    var makeFTP: (String, Int?, String, String, Bool) -> FTPFileSystem = { host, port, user, password, secure in
+        FTPFileSystem(host: host, port: port, user: user, password: password, secure: secure)
+    }
+    var saveFTPSecret: (String, String, String, Bool) -> Void = {
+        PasswordKeychain.save($0, server: $1, account: $2, proto: $3 ? kSecAttrProtocolFTPS : kSecAttrProtocolFTP)
+    }
+    var savedFTPSecret: (String, String, Bool) -> String? = {
+        PasswordKeychain.password(server: $0, account: $1, proto: $2 ? kSecAttrProtocolFTPS : kSecAttrProtocolFTP)
+    }
 
     /// Called with a server that is connected and listed, and the place to show.
     var didConnect: (any RemoteFileSystem, URL) -> Void = { _, _ in }
@@ -201,5 +219,40 @@ final class Connections {
         pendingTrust = nil
         trustServer = nil
         resumeAfterTrust = nil
+    }
+
+    /// Connect to FTP: sign in, then show the server's top folder.
+    func connectFTP(host rawHost: String, port rawPort: String, user rawUser: String, password: String, protocol choice: FTPProtocol, remember: Bool) {
+        guard !isConnecting else { return }
+        let host = rawHost.trimmingCharacters(in: .whitespaces)
+        let user = rawUser.trimmingCharacters(in: .whitespaces)
+        guard !host.isEmpty else { connectError = "Type the server name, like ftp.example.com."; return }
+        var port: Int?
+        if !rawPort.trimmingCharacters(in: .whitespaces).isEmpty {
+            guard let number = Int(rawPort.trimmingCharacters(in: .whitespaces)), (1...65535).contains(number) else {
+                connectError = "The port is a number from 1 to 65535."; return
+            }
+            port = number
+        }
+        guard !user.isEmpty else { connectError = "Type the user name."; return }
+        let secure = choice == .tls
+        let secret = password.isEmpty ? savedFTPSecret(host, user, secure) ?? "" : password
+        guard !secret.isEmpty else { connectError = "Type the password."; return }
+        connectError = nil
+        isConnecting = true
+        let server = makeFTP(host, port, user, secret, secure)
+        Task {
+            defer { isConnecting = false }
+            do {
+                let start = try await server.start()
+                if remember { saveFTPSecret(secret, host, user, secure) }
+                showConnectSheet = false
+                didConnect(server, RemoteURL.make(scheme: secure ? "ftps" : "ftp", host: host, port: port, path: start))
+            } catch let error as RemoteError {
+                connectError = error.message
+            } catch {
+                connectError = "Unable to reach the server."
+            }
+        }
     }
 }

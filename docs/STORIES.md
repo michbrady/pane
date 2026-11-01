@@ -487,7 +487,8 @@ Acceptance:
 - [self] Plain FTP shows a note: "FTP sends your password without encryption." with "FTP with TLS" as the first choice.
 - [manual] Listing, passive mode, and a UTF-8 name work against a real server. [U] Test against vsftpd and a hosting provider.
 - [unit] Unix and Windows (IIS) directory listings both parse into names, sizes, and dates.
-Status: todo
+Note: Decided: the system `curl` through the same runner as SFTP (passive mode, explicit TLS with `--ssl-reqd`, UTF-8 names), so there is no FTP client to write or ship. The login goes in on stdin, never in arguments. FTP with TLS is the first choice and stops if the server will not do TLS. Paths are relative to the folder the server signs you in to. Tested with a scripted runner: Unix and IIS listings, error words, the exact request. [manual] Real servers: vsftpd and a hosting provider. A server with a self-signed certificate shows "Unable to verify this server's certificate." with no way past it yet. Browsing only until S-064 and S-065.
+Status: done
 
 ### S-062 Connect to an SFTP server
 As the user, I add an SFTP server and sign in with a password or a key from `~/.ssh`, and browse it.

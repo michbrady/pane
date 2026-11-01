@@ -12,6 +12,8 @@ extension SelfTest {
         // S-041 Use the Command bar
         model.tab.go(to: docs)
         await settle()
+        // Rename and the edit keys belong to a text field that has focus. Start from none.
+        NSApp.keyWindow?.makeFirstResponder(nil)
         model.tab.selection = []
         check("Cut and Copy are dimmed with nothing selected", !model.canCopy)
         check("Rename is dimmed with nothing selected", !model.actions.canRename)

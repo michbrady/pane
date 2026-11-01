@@ -13,7 +13,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, cloud, unavailable, connect, connectS3 = "connect-s3", connectFTP = "connect-ftp", connectSFTP = "connect-sftp", connectSFTPTrust = "connect-sftp-trust", remote, remoteLost = "remote-lost", onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -121,12 +121,13 @@ enum Snapshot {
                     try? FileManager.default.removeItem(at: gone)
                     model.tab.reload()
                 }
-            case .connect, .connectS3, .connectSFTP, .connectSFTPTrust:
+            case .connect, .connectS3, .connectFTP, .connectSFTP, .connectSFTPTrust:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
-                model.connections.kind = self == .connectS3 ? .s3 : (self == .connectSFTP || self == .connectSFTPTrust) ? .sftp : .share
+                model.connections.kind = self == .connectS3 ? .s3 : self == .connectFTP ? .ftp : (self == .connectSFTP || self == .connectSFTPTrust) ? .sftp : .share
                 model.connections.clearRecentServers()
                 model.connections.recentServersForSnapshot(["smb://nas/photos", "smb://backup.local/files"])
                 model.connections.openConnectSheet()
+                model.connections.ftpProtocol = .plain
                 if self == .connectSFTPTrust {
                     model.connections.showTrustForSnapshot(host: "nas.local", fingerprint: "SHA256:7vQ2kXc0nR9aYtL3mH8dFhP1uJ4bWzE6sOiTgNxKqAw")
                 }
