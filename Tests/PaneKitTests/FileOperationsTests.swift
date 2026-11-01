@@ -490,6 +490,67 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(!volumes.contains { $0.url.path.hasPrefix("/System/Volumes") })
 }
 
+@Test func cloudProvidersGetTheNamesPeopleKnow() {
+    #expect(CloudLocations.displayName(forFolderName: "Dropbox") == "Dropbox")
+    #expect(CloudLocations.displayName(forFolderName: "GoogleDrive-me@example.com") == "Google Drive (me@example.com)")
+    #expect(CloudLocations.displayName(forFolderName: "OneDrive-Work") == "OneDrive (Work)")
+    #expect(CloudLocations.displayName(forFolderName: "OneDrive") == "OneDrive")
+    #expect(CloudLocations.displayName(forFolderName: "Box-Box") == "Box")
+    #expect(CloudLocations.displayName(forFolderName: "SomethingElse") == "SomethingElse")
+}
+
+@Test func cloudFoldersAreFoundUnderTheHomeFolder() throws {
+    let home = FileManager.default.temporaryDirectory.appending(path: "pane-cloud-\(UUID().uuidString)")
+    let fm = FileManager.default
+    for path in ["Library/Mobile Documents/com~apple~CloudDocs", "Library/CloudStorage/Dropbox", "Library/CloudStorage/GoogleDrive-me@example.com", "Library/CloudStorage/.hidden"] {
+        try fm.createDirectory(at: home.appending(path: path), withIntermediateDirectories: true)
+    }
+    try Data("x".utf8).write(to: home.appending(path: "Library/CloudStorage/loose-file.txt"))
+    defer { try? fm.removeItem(at: home) }
+    let found = CloudLocations.list(home: home)
+    #expect(found.map(\.name) == ["iCloud Drive", "Dropbox", "Google Drive (me@example.com)"])
+    #expect(CloudLocations.list(home: home.appending(path: "nowhere")).isEmpty)
+}
+
+@Test func onlineOnlyFilesAreRecognizedByTheDatalessFlag() {
+    #expect(OnlineStatus.isOnlineOnly(flags: 0x4000_0000))
+    #expect(OnlineStatus.isOnlineOnly(flags: 0x4000_0020))
+    #expect(!OnlineStatus.isOnlineOnly(flags: 0x20))
+    #expect(!OnlineStatus.isOnlineOnly(FileManager.default.temporaryDirectory))
+}
+
+@Test func oldICloudStubsAreShownUnderTheRealNameAndSize() throws {
+    #expect(OnlineStatus.realName(ofPlaceholder: ".Report.pdf.icloud") == "Report.pdf")
+    #expect(OnlineStatus.realName(ofPlaceholder: ".Notes.icloud") == "Notes")
+    #expect(OnlineStatus.realName(ofPlaceholder: "Report.pdf") == nil)
+    #expect(OnlineStatus.realName(ofPlaceholder: ".gitignore") == nil)
+    let root = FileManager.default.temporaryDirectory.appending(path: "pane-stub-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let plist = try PropertyListSerialization.data(fromPropertyList: ["NSURLFileSizeKey": 123_456, "NSURLNameKey": "Report.pdf"], format: .binary, options: 0)
+    try plist.write(to: root.appending(path: ".Report.pdf.icloud"))
+    try Data("x".utf8).write(to: root.appending(path: "local.txt"))
+    try Data("x".utf8).write(to: root.appending(path: ".dotfile"))
+    let listed = try FolderLister.list(root)
+    #expect(listed.map(\.name) == ["local.txt", "Report.pdf"])
+    let stub = try #require(listed.first { $0.name == "Report.pdf" })
+    #expect(stub.isOnlineOnly && stub.size == 123_456 && stub.kind == "PDF document")
+    #expect(!listed.contains { $0.name.hasSuffix(".icloud") })
+}
+
+@Test func theStatusBarCountsOnlineOnlyItems() {
+    #expect(SelectionSummary.text(itemCount: 12, selected: [], onlineOnly: 3) == "12 items  ·  3 online only")
+    #expect(SelectionSummary.text(itemCount: 12, selected: [], onlineOnly: 0) == "12 items")
+    #expect(SelectionSummary.text(itemCount: 4, selected: [item("a", size: 1_000_000)], onlineOnly: 1) == "1 item selected  1 MB  ·  1 online only")
+}
+
+@Test func materializingALocalFileJustWorks() async throws {
+    let file = FileManager.default.temporaryDirectory.appending(path: "pane-mat-\(UUID().uuidString).txt")
+    try Data("hello".utf8).write(to: file)
+    defer { try? FileManager.default.removeItem(at: file) }
+    try await CloudDownload.materialize(file)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

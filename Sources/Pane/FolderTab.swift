@@ -33,6 +33,8 @@ final class FolderTab: Identifiable {
     /// Spotlight, when the app has it. Tests leave it nil, so they scan.
     var spotlight: SpotlightSearching?
     private var searchTask: Task<Void, Never>?
+    /// Asked to open a file that is in the cloud but not on this Mac. The app downloads it, then opens it.
+    var requestDownload: ((URL) -> Void)?
     /// Says whether a folder is on a network share. Tests swap it.
     var isNetworkFolder: (URL) -> Bool = { VolumeInfo.isNetwork($0) }
     /// Seconds between looks at the folder when it is on a share, or nil when the system tells us.
@@ -98,7 +100,9 @@ final class FolderTab: Identifiable {
             go(to: only.url)
             return
         }
-        for item in chosen where !item.isFolder { openFile(item.url) }
+        for item in chosen where !item.isFolder {
+            if item.isOnlineOnly, let requestDownload { requestDownload(item.url) } else { openFile(item.url) }
+        }
     }
 
     /// Moves the selection to the next or previous item, and keeps it inside the list.

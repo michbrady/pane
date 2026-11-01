@@ -24,7 +24,12 @@ enum Locations {
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
+    /// Friendly names for cloud folders by path, so the tab and title say "iCloud Drive", not "com~apple~CloudDocs".
+    /// AppModel fills it in whenever it looks for cloud folders.
+    static var cloudNames: [String: String] = [:]
+
     static func displayName(for url: URL) -> String {
+        if let name = cloudNames[url.standardizedFileURL.path] { return name }
         if url.path == "/" { return FileManager.default.displayName(atPath: "/") }
         if url.path == home.path, !isOverridden { return NSUserName() }
         return FileManager.default.displayName(atPath: url.path)

@@ -137,6 +137,12 @@ struct NameCell: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .help(item.name)
+                if item.isOnlineOnly {
+                    Image(systemName: "icloud")
+                        .foregroundStyle(.secondary)
+                        .help("Not on this Mac yet. Opening it downloads it.")
+                        .accessibilityLabel("Online only")
+                }
             }
         }
         .opacity(model.actions.isCut(item.url) ? Surfaces.cutOpacity : 1)

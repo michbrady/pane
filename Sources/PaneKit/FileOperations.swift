@@ -43,6 +43,11 @@ public struct OperationProgress: Sendable {
 public struct OperationFailure: Sendable {
     public let url: URL
     public let message: String
+
+    public init(url: URL, message: String) {
+        self.url = url
+        self.message = message
+    }
 }
 
 public struct OperationResult: Sendable {

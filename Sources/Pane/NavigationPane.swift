@@ -17,6 +17,11 @@ struct NavigationPane: View {
             Section("This Mac") {
                 ForEach(model.thisMacRoots) { NavRow(node: $0) }
             }
+            if !model.cloudRoots.isEmpty {
+                Section("Cloud") {
+                    ForEach(model.cloudRoots) { NavRow(node: $0) }
+                }
+            }
             if !model.networkRoots.isEmpty {
                 Section("Network") {
                     ForEach(model.networkRoots) { NavRow(node: $0) }

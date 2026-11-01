@@ -447,7 +447,8 @@ Acceptance:
 - [self] Opening an online-only file downloads it, with progress, and then opens it.
 - [self] The list updates when a provider finishes syncing.
 - [unit] Placeholder files are listed by their real name and size, not `.icloud` names.
-Status: todo
+Note: folders, names, the stub name and size, the cloud icon, the Status bar count, and download-then-open (with a failure message) are tested with a fake home folder. Providers really appear under `~/Library/CloudStorage` on macOS 26 [U], and a real online-only Dropbox, Google Drive, OneDrive, or iCloud file downloading needs a hand test [manual]. Progress is a bar with the file name, not a percentage.
+Status: done
 
 ### S-045 Reveal and open in Terminal
 As the user, I right-click a folder and choose Open in Terminal.

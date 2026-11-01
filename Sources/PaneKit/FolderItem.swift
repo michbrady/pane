@@ -14,11 +14,13 @@ public struct FolderItem: Identifiable, Hashable, Sendable {
     public let created: Date?
     /// Finder tag names, like "Red" or "Work".
     public let tags: [String]
+    /// In the cloud but not yet on this Mac: opening it downloads it first.
+    public let isOnlineOnly: Bool
 
     public var id: URL { url }
 
     public init(url: URL, name: String, isFolder: Bool, size: Int64?, modified: Date?, kind: String,
-                created: Date? = nil, tags: [String] = []) {
+                created: Date? = nil, tags: [String] = [], isOnlineOnly: Bool = false) {
         self.url = url
         self.name = name
         self.isFolder = isFolder
@@ -27,5 +29,6 @@ public struct FolderItem: Identifiable, Hashable, Sendable {
         self.kind = kind
         self.created = created
         self.tags = tags
+        self.isOnlineOnly = isOnlineOnly
     }
 }

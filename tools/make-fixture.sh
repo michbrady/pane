@@ -3,7 +3,8 @@
 set -eu
 home=${1:?usage: make-fixture.sh <dir>}
 rm -rf "$home"
-mkdir -p "$home"/{Desktop,Downloads,Pictures,Music,Empty} "$home"/Volumes/{Backup,NAS} "$home"/Documents/{Work,Personal,"Tax Returns"}
+mkdir -p "$home"/{Desktop,Downloads,Pictures,Music,Empty} "$home"/Volumes/{Backup,NAS}
+mkdir -p "$home/Library/Mobile Documents/com~apple~CloudDocs" "$home/Library/CloudStorage/Dropbox" "$home/Library/CloudStorage/GoogleDrive-me@example.com" "$home"/Documents/{Work,Personal,"Tax Returns"}
 file() { # path size-in-KB date
   mkdir -p "${1:h}"; dd if=/dev/zero of="$1" bs=1024 count="$2" 2>/dev/null; touch -t "$3" "$1"
 }
@@ -53,3 +54,12 @@ out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(o
 open(f"{home}/Documents/Trip itinerary.pdf", "wb").write(out + b"\n" * (1884160 - len(out)))
 PY
 touch -t 202610310714 "$d/Notes.txt"; touch -t 202609300800 "$d/Trip itinerary.pdf"; touch -t 202608141530 "$home/Pictures/Beach.jpg"
+# An old-style iCloud stub: a hidden file that stands for "Report.pdf", which is not on this Mac.
+python3 - "$home" <<'PY'
+import plistlib, sys
+home = sys.argv[1]
+icloud = f"{home}/Library/Mobile Documents/com~apple~CloudDocs"
+open(f"{icloud}/.Report.pdf.icloud", "wb").write(plistlib.dumps({"NSURLFileSizeKey": 482304, "NSURLNameKey": "Report.pdf"}, fmt=plistlib.FMT_BINARY))
+open(f"{icloud}/Shopping list.txt", "w").write("milk\neggs\n")
+open(f"{home}/Library/CloudStorage/Dropbox/Team notes.txt", "w").write("shared\n")
+PY

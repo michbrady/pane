@@ -26,6 +26,7 @@ struct StatusBar: View {
     }
 
     private var summary: String {
-        SelectionSummary.text(itemCount: model.tab.items.count, selected: model.tab.selectedItems)
+        SelectionSummary.text(itemCount: model.tab.items.count, selected: model.tab.selectedItems,
+                              onlineOnly: model.tab.items.filter(\.isOnlineOnly).count)
     }
 }

@@ -172,6 +172,24 @@ final class FileActions {
         pendingConflict = nil
     }
 
+    // MARK: Cloud files
+
+    /// A file that is in the cloud and not here: download it, with the progress sheet after a second, then open it.
+    /// `open` is a parameter so tests do not launch an app.
+    func downloadAndOpen(_ url: URL, open: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }) {
+        guard operationTask == nil else { return }
+        run(title: "Downloading") {
+            var result = OperationResult(record: OperationRecord(name: "Download", steps: []))
+            do { try await CloudDownload.materialize(url) } catch {
+                result.failures.append(OperationFailure(url: url, message: "It could not be downloaded. \(error.localizedDescription)"))
+            }
+            return result
+        } finished: { result in
+            if result.failures.isEmpty { open(url) }
+            return result
+        }
+    }
+
     // MARK: Trash and delete
 
     func trashSelection() {

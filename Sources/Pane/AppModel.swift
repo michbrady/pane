@@ -39,6 +39,8 @@ final class AppModel {
     let homeRoot: NavNode
     private(set) var driveRoots: [NavNode] = []
     private(set) var networkRoots: [NavNode] = []
+    /// iCloud Drive and the cloud services installed on this Mac.
+    private(set) var cloudRoots: [NavNode] = []
     var thisMacRoots: [NavNode] { [homeRoot] + driveRoots }
     /// Where the mounted volumes come from. Tests use a fake list, so they see the same on every Mac.
     var volumeSource: () -> [VolumeInfo] = { Locations.isOverridden ? [] : VolumeInfo.mounted() }
@@ -112,6 +114,7 @@ final class AppModel {
     private func makeTab(start: URL) -> FolderTab {
         let tab = FolderTab(start: start, view: view)
         tab.spotlight = Locations.isOverridden ? nil : SystemSpotlight()
+        tab.requestDownload = { [unowned self] url in actions.downloadAndOpen(url) }
         tab.didNavigate = { [unowned self, unowned tab] in
             // A tab in the background changes nothing outside itself.
             if tab === self.tab { activated() } else { saveTabs() }
@@ -281,7 +284,8 @@ final class AppModel {
         let url = tab.currentFolder
         // The root that holds this folder: the home folder, a drive, or a share. The deepest one wins.
         let roots: [(prefix: String, path: String)] =
-            [("home:", Locations.home.path)] + driveRoots.map { ("vol:", $0.url.path) } + networkRoots.map { ("net:", $0.url.path) } + [("vol:", "/")]
+            [("home:", Locations.home.path)] + driveRoots.map { ("vol:", $0.url.path) } + networkRoots.map { ("net:", $0.url.path) }
+            + cloudRoots.map { ("cloud:", $0.url.path) } + [("vol:", "/")]
         let holder = roots.filter { url.path == $0.path || url.path.hasPrefix($0.path == "/" ? "/" : $0.path + "/") }
             .max { $0.path.count < $1.path.count } ?? ("vol:", "/")
         let pinned = quickRoots.contains { $0.url.path == url.path }
@@ -299,6 +303,9 @@ final class AppModel {
         let sections = VolumeSections.split(volumeSource())
         driveRoots = sections.drives.map { NavNode(url: $0.url, prefix: "vol:", name: $0.name, ejectable: $0.isEjectable) }
         networkRoots = sections.network.map { NavNode(url: $0.url, prefix: "net:", name: $0.name, ejectable: true) }
+        let cloud = CloudLocations.list(home: Locations.home)
+        Locations.cloudNames = Dictionary(uniqueKeysWithValues: cloud.map { ($0.url.path, $0.name) })
+        cloudRoots = cloud.map { NavNode(url: $0.url, prefix: "cloud:", name: $0.name) }
         syncTree()
     }
 
