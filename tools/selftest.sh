@@ -7,4 +7,4 @@ if pgrep -x Pane >/dev/null; then pkill -x Pane; for i in 1 2 3 4 5 6 7 8 9 10; 
 rm -rf ~/Library/Saved\ Application\ State/com.michaelbrady.pane.savedState
 defaults delete com.michaelbrady.pane.test 2>/dev/null
 $here/make-fixture.sh /tmp/Pane-self-home
-APP_HOME=/tmp/Pane-self-home ~/Applications/Pane.app/Contents/MacOS/Pane --selftest
+APP_HOME=/tmp/Pane-self-home /Applications/Pane.app/Contents/MacOS/Pane --selftest

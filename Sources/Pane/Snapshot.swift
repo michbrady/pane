@@ -4,7 +4,7 @@ import PaneKit
 import SwiftUI
 
 /// Screenshot mode for agents.
-///   APP_STORE=/tmp/test.store APP_SNAPSHOT=/tmp/shots ~/Applications/Pane.app/Contents/MacOS/Pane
+///   APP_STORE=/tmp/test.store APP_SNAPSHOT=/tmp/shots /Applications/Pane.app/Contents/MacOS/Pane
 /// writes <page>-light.png and <page>-dark.png for every snapshot page (SnapshotPage), and
 /// settings-<tab>-light.png and settings-<tab>-dark.png for every Settings tab, then quits.
 /// Each PNG gets a <page>-<mode>-layout.json with the grid probes (tools/check-layout.swift).

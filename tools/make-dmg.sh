@@ -2,11 +2,11 @@
 # Builds the installer disk image, website/Pane.dmg: a window with Pane and an Applications
 # folder, an arrow between them, and Pane's icon on the disk. People drag one onto the other.
 #
-# Run ./build.sh first: this packs ~/Applications/Pane.app.
+# Run ./build.sh first: this packs /Applications/Pane.app.
 # Usage: tools/make-dmg.sh [output.dmg]        (default website/Pane.dmg)
 set -euo pipefail
 here=${0:A:h:h}
-app="$HOME/Applications/Pane.app"
+app="/Applications/Pane.app"
 out=${1:-$here/website/Pane.dmg}
 volume="Pane"
 [[ -d "$app" ]] || { echo "no $app: run ./build.sh first"; exit 1; }

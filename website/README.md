@@ -10,7 +10,7 @@ Upload these three files to the same folder on the web server (`bradysbit.com/pa
 `Pane.dmg` is not kept in git. To make a new one and update the page (the size and checksum are filled in for you):
 
 ```sh
-./build.sh                       # build the app into ~/Applications
+./build.sh                       # build the app into /Applications
 tools/make-dmg.sh                # pack it into website/Pane.dmg (lets Finder lay out the window)
 python3 website/source/build.py  # rewrites website/index.html and website/privacy.html
 ```

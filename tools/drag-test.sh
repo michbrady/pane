@@ -11,7 +11,7 @@ pkill -x Pane 2>/dev/null; sleep 1
 $here/make-fixture.sh $home
 rm -rf ~/Library/Saved\ Application\ State/com.michaelbrady.pane.savedState
 defaults delete com.michaelbrady.pane.test 2>/dev/null
-(APP_HOME=$home APP_START=$home/Documents ~/Applications/Pane.app/Contents/MacOS/Pane >/dev/null 2>&1 &)
+(APP_HOME=$home APP_START=$home/Documents /Applications/Pane.app/Contents/MacOS/Pane >/dev/null 2>&1 &)
 sleep 4
 osascript -e 'tell application "System Events" to set frontmost of (first process whose name is "Pane") to true' 2>/dev/null
 sleep 1

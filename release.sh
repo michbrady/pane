@@ -24,7 +24,7 @@ xcrun notarytool history --keychain-profile "$profile" >/dev/null 2>&1 || {
 }
 
 "$here/build.sh" >/dev/null
-app="$HOME/Applications/$name.app"
+app="/Applications/$name.app"
 # Hardened runtime and a secure timestamp are what notarization requires.
 codesign --force --options runtime --timestamp --sign "$identity" "$app"
 codesign --verify --strict --deep --verbose=2 "$app"

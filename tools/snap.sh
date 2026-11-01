@@ -4,7 +4,7 @@
 #        APP_SNAPSHOT_PAGES=window,settings tools/snap.sh
 set -u
 here=${0:A:h}
-app=~/Applications/Pane.app/Contents/MacOS/Pane
+app=/Applications/Pane.app/Contents/MacOS/Pane
 home=/tmp/Pane-home
 shots=/tmp/Pane-shots
 # A crashed run leaves saved window state, and the next launch would wait on a "reopen windows?" alert.

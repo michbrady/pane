@@ -23,7 +23,7 @@ Tabs, search, a preview pane, tags, SMB and cloud storage folders, and FTP, SFTP
 You need macOS 26 or later and Swift 6.2 or later. There is no Xcode project.
 
 ```sh
-./build.sh --open            # builds and installs ~/Applications/Pane.app, then opens it
+./build.sh --open            # builds and installs /Applications/Pane.app, then opens it
 swift test --scratch-path ~/Library/Developer/Pane/test-build
 tools/selftest.sh            # the app's own checks on a throwaway folder
 ```

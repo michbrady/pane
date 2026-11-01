@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds Pane and installs it to ~/Applications/Pane.app.
+# Builds Pane and installs it to /Applications/Pane.app.
 # Build products live in ~/Library/Developer/Pane, outside the repo
 # (and outside Dropbox or iCloud, which would try to sync them).
 #
@@ -37,8 +37,7 @@ if [[ -n "$stale" ]]; then
   exit 1
 fi
 
-app="$HOME/Applications/$name.app"
-mkdir -p "$HOME/Applications"
+app="/Applications/$name.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/$name"

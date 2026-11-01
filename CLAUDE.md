@@ -9,7 +9,7 @@ and S3 servers as folders. Swift 6, macOS 26, `PaneKit` plus the app. Free, MIT,
 - `Sources/Pane/` the app. `App.swift` has the window and menus. `AppModel.swift` holds navigation state. `Locations.swift` has the home folder and `Prefs`.
 - `Sources/PaneKit/` rules and data logic with no SwiftUI. Tests in `Tests/PaneKitTests/`.
 - `Package.swift` a Swift package. There is no Xcode project.
-- `build.sh` builds, signs, and installs `~/Applications/Pane.app`.
+- `build.sh` builds, signs, and installs `/Applications/Pane.app`.
 - `Icon/AppIcon.icon` the app icon, an Icon Composer file (JSON plus SVG layers). `build.sh` compiles it with `tools/make_icon.sh`; `tools/icon_review.sh` renders every look into one PNG.
 - `docs/` `BRIEF.md`, `STORIES.md` (the backlog: status of every story), `GLOSSARY.md` (one name per thing), `DESIGN.md`, `FIXLOG.md`, and `architecture-review-*.md`. `ARCHITECTURE.md` at the root maps the targets and seams.
 - Tests in `Tests/PaneKitTests/`: one file per area, shared helpers in `TestSupport.swift`. `swift test` runs them.
