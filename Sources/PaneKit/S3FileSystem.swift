@@ -99,9 +99,7 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
     public func reconnect() async throws { _ = try await buckets() }
     public func disconnect() async {}
 
-    public func exists(_ url: URL) async -> Bool {
-        (try? await list(url)) != nil
-    }
+    public func exists(_ url: URL) async -> Bool { await RemoteTree.exists(url, in: self) }
 
     public func list(_ folder: URL) async throws -> [FolderItem] {
         let pieces = RemoteURL.pathComponents(RemoteURL.canonical(folder))
@@ -134,7 +132,37 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
     }
 
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
-    public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
+    /// S3 has no rename: copy to the new key, then delete the old one. A folder goes key by key.
+    public func move(_ source: URL, to destination: URL) async throws {
+        let from = RemoteURL.pathComponents(RemoteURL.canonical(source)), to = RemoteURL.pathComponents(RemoteURL.canonical(destination))
+        guard from.count >= 2, to.count >= 2 else { throw RemoteError.other("Buckets cannot be renamed here. Do that in the S3 console.") }
+        let sourceKey = "/" + from.joined(separator: "/")
+        let children = try await list(source)
+        if children.isEmpty {
+            do { try await copyKey(from: sourceKey, to: "/" + to.joined(separator: "/")) } catch {
+                // No such file: an empty folder is just its "folder/" key.
+                try await makeFolder(destination)
+                _ = try await send("DELETE", path: sourceKey + "/")
+                return
+            }
+            _ = try await send("DELETE", path: sourceKey)
+        } else {
+            for child in children { try await move(child.url, to: RemoteURL.child(of: destination, named: RemoteURL.name(of: child.url))) }
+            try await makeFolder(destination)
+            _ = try await send("DELETE", path: sourceKey + "/")
+        }
+    }
+
+    private func copyKey(from source: String, to destination: String) async throws {
+        let encoded = source.split(separator: "/", omittingEmptySubsequences: false)
+            .map { String($0).addingPercentEncoding(withAllowedCharacters: CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")) ?? String($0) }
+            .joined(separator: "/")
+        let request = try signedRequest("PUT", path: destination, query: [], payloadHash: nil, headers: ["x-amz-copy-source": encoded])
+        let (data, response) = try await transport.send(request)
+        guard (200..<300).contains(response.statusCode) else { throw Self.error(status: response.statusCode, body: data) }
+        // S3 can answer 200 and still say it failed.
+        if S3Listing.parseError(data) != nil { throw Self.error(status: 500, body: data) }
+    }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
 
     /// A folder is a key ending in "/". Buckets are made in the S3 console, not here.
@@ -209,7 +237,7 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
     }
 
     /// Path-style addressing (`host/bucket/key`) works for AWS and for MinIO, R2, and the rest.
-    private func signedRequest(_ method: String, path: String, query: [URLQueryItem], payloadHash: String?) throws -> URLRequest {
+    private func signedRequest(_ method: String, path: String, query: [URLQueryItem], payloadHash: String?, headers: [String: String] = [:]) throws -> URLRequest {
         var parts = URLComponents()
         parts.scheme = secure ? "https" : "http"
         parts.host = host
@@ -228,9 +256,9 @@ public final class S3FileSystem: RemoteFileSystem, @unchecked Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = payloadHash == nil && method == "GET" ? 30 : 600
-        for (name, value) in S3Signer.sign(method: method, url: url, credentials: credentials, region: region, date: now(), payloadHash: payloadHash) {
-            request.setValue(value, forHTTPHeaderField: name)
-        }
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        let signed = S3Signer.sign(method: method, url: url, headers: headers, credentials: credentials, region: region, date: now(), payloadHash: payloadHash)
+        for (name, value) in signed { request.setValue(value, forHTTPHeaderField: name) }
         return request
     }
 

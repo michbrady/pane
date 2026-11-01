@@ -63,11 +63,15 @@ final class FileActions {
     // MARK: Copy, cut, paste
 
     /// Changing files on a server (paste, Trash, rename, new folder, delete, drop) is not built yet.
-    /// Say so, and never let a server address reach a local file call. Returns true when blocked.
-    private func blockedOnServer() -> Bool {
-        guard tab.isRemote else { return false }
-        alertMessage = "Changing files on a server comes in a later step. For now, you can browse it."
-        return true
+    /// The operations for the current tab: this Mac's, or the server's. A server address never reaches a local
+    /// file call. Nil, with a message, when the tab's server is no longer connected.
+    private func operationsForTab() -> FileOperations? {
+        guard tab.isRemote else { return operations }
+        guard let server = router.remote(for: tab.currentFolder) else {
+            alertMessage = RemoteError.notConnected.message
+            return nil
+        }
+        return FileOperations(server)
     }
 
     private var editingText: NSText? { NSApp.keyWindow?.firstResponder as? NSText }
@@ -221,7 +225,8 @@ final class FileActions {
     // MARK: Trash and delete
 
     func trashSelection() {
-        if blockedOnServer() { return }
+        // A server has no Trash, so Delete asks first, like Shift-Delete does.
+        if tab.isRemote { askDeleteImmediately(); return }
         let urls = Array(tab.selection)
         guard !urls.isEmpty, operationTask == nil, editingText == nil else { return }
         tab.pendingSelection = tab.items.firstIndex { tab.selection.contains($0.url) }.map { ($0, Set(urls)) }
@@ -230,19 +235,33 @@ final class FileActions {
 
     /// Shift-Delete asks first, because this cannot be undone.
     func askDeleteImmediately() {
-        if blockedOnServer() { return }
         guard !tab.selection.isEmpty, editingText == nil else { return }
         pendingDelete = Array(tab.selection)
     }
 
+    /// True when the items waiting to be deleted are on a server, which has no Trash.
+    var deletingOnServer: Bool { pendingDelete?.first.map(RemoteURL.isRemote) ?? false }
+
+    /// The question, naming what goes and where from. "Delete 3 items from nas?"
+    var deleteTitle: String {
+        guard let urls = pendingDelete, let first = urls.first else { return "" }
+        if RemoteURL.isRemote(first) {
+            let server = first.host ?? "the server"
+            return urls.count == 1 ? "Delete \u{201C}\(RemoteURL.name(of: first))\u{201D} from \(server)?" : "Delete \(urls.count) items from \(server)?"
+        }
+        return urls.count == 1 ? "Delete \u{201C}\(first.lastPathComponent)\u{201D} Immediately?" : "Delete \(urls.count) Items Immediately?"
+    }
+
+    var deleteButtonTitle: String { deletingOnServer ? "Delete" : "Delete Immediately" }
+
     func deleteImmediately() {
-        if blockedOnServer() { pendingDelete = nil; return }
         guard let urls = pendingDelete, operationTask == nil else { return }
         pendingDelete = nil
+        guard let ops = operationsForTab() else { return }
         tab.pendingSelection = tab.items.firstIndex { urls.contains($0.url) }.map { ($0, Set(urls)) }
         run(title: "Deleting") { [self] in
             OperationResult(record: OperationRecord(name: "Delete Immediately", steps: []),
-                            failures: await operations.deleteImmediately(urls))
+                            failures: await ops.deleteImmediately(urls))
         } finished: { $0 }
     }
 
@@ -272,7 +291,6 @@ final class FileActions {
     var canRename: Bool { tab.selection.count == 1 && editingText == nil }
 
     func beginRename() {
-        if blockedOnServer() { return }
         guard canRename, let item = tab.selectedItems.first else { return }
         renameText = item.name
         renameError = nil
@@ -288,15 +306,17 @@ final class FileActions {
     func commitRename(fromBlur: Bool = false) {
         guard let url = renamingURL, let item = tab.items.first(where: { $0.url == url }) else { return }
         if renameText == item.name { cancelRename(); return }
+        guard let ops = operationsForTab() else { cancelRename(); return }
+        let onServer = tab.isRemote
         let text = renameText
         backgroundWork += 1
         Task {
             defer { backgroundWork -= 1 }
             do {
-                let record = try await operations.rename(url, to: text)
+                let record = try await ops.rename(url, to: text)
                 renamingURL = nil
                 renameError = nil
-                remember(record)
+                if !onServer { remember(record) }   // a server has no Trash to undo into
                 let renamed = url.deletingLastPathComponent().appending(path: text.trimmingCharacters(in: .whitespacesAndNewlines))
                 selectAfterReload(path: renamed.standardizedFileURL.path)
                 tab.reload()
@@ -315,15 +335,15 @@ final class FileActions {
 
     /// Cmd-Shift-N: make "New folder" and start naming it.
     func newFolder() {
-        if blockedOnServer() { return }
-        guard editingText == nil, operationTask == nil else { return }
+        guard editingText == nil, operationTask == nil, let ops = operationsForTab() else { return }
+        let onServer = tab.isRemote
         let folder = tab.currentFolder
         backgroundWork += 1
         Task {
             defer { backgroundWork -= 1 }
             do {
-                let (url, record) = try await operations.makeFolder(in: folder)
-                remember(record)
+                let (url, record) = try await ops.makeFolder(in: folder)
+                if !onServer { remember(record) }
                 tab.afterReload = { [self] in
                     guard let item = tab.items.first(where: { $0.url.standardizedFileURL.path == url.standardizedFileURL.path }) else { return }
                     tab.selection = [item.url]

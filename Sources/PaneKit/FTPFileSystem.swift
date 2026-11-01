@@ -83,7 +83,7 @@ public final class FTPFileSystem: RemoteFileSystem, @unchecked Sendable {
     public func reconnect() async throws { _ = try await start() }
     public func disconnect() async {}
 
-    public func exists(_ url: URL) async -> Bool { (try? await list(url)) != nil }
+    public func exists(_ url: URL) async -> Bool { await RemoteTree.exists(url, in: self) }
 
     public func list(_ folder: URL) async throws -> [FolderItem] {
         let output = try await fetch(RemoteURL.canonical(folder).path)
@@ -91,7 +91,17 @@ public final class FTPFileSystem: RemoteFileSystem, @unchecked Sendable {
     }
 
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
-    public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
+    /// Renames within one folder. FTP's rename works from the folder it is in, so moving elsewhere is not offered yet.
+    public func move(_ source: URL, to destination: URL) async throws {
+        guard RemoteURL.parent(of: source).map(RemoteURL.canonical) == RemoteURL.parent(of: destination).map(RemoteURL.canonical) else {
+            throw RemoteError.other("Moving between folders on an FTP server is not supported yet. Copy it, then delete the original.")
+        }
+        let folder = RemoteURL.parent(of: source) ?? source
+        _ = try await curl(address(of: folder, folder: true), extra: [
+            "quote = \(FTPText.configQuote("-RNFR " + RemoteURL.name(of: source)))",
+            "quote = \(FTPText.configQuote("-RNTO " + RemoteURL.name(of: destination)))",
+        ])
+    }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
 
     public func makeFolder(_ url: URL) async throws {

@@ -26,6 +26,10 @@ extension RemoteError {
     }
 }
 
+extension RemoteError: LocalizedError {
+    public var errorDescription: String? { message }
+}
+
 /// A file system on a server. FTP, SFTP, and S3 each provide one. It works on URLs like
 /// `sftp://host/folder`, so the rest of Pane treats it like any other place.
 public typealias ByteProgress = @Sendable (Int64) -> Void
@@ -151,7 +155,17 @@ public final class InMemoryRemote: RemoteFileSystem, @unchecked Sendable {
     }
 
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
-    public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
+    public func move(_ source: URL, to destination: URL) async throws {
+        guard !isLost else { throw RemoteError.connectionLost }
+        let from = RemoteURL.canonical(source).path, to = RemoteURL.canonical(destination).path
+        try await inner.move(innerURL(source), to: innerURL(destination))
+        lock.withLock {
+            for key in contents.keys where key == from || key.hasPrefix(from + "/") {
+                contents[to + key.dropFirst(from.count)] = contents[key]
+                contents[key] = nil
+            }
+        }
+    }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
 
     public func remove(_ url: URL) async throws {

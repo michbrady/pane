@@ -63,7 +63,7 @@ public final class SFTPFileSystem: RemoteFileSystem, @unchecked Sendable {
 
     // MARK: FileSystem
 
-    public func exists(_ url: URL) async -> Bool { (try? await list(url)) != nil }
+    public func exists(_ url: URL) async -> Bool { await RemoteTree.exists(url, in: self) }
 
     public func list(_ folder: URL) async throws -> [FolderItem] {
         let path = RemoteURL.canonical(folder).path
@@ -72,7 +72,9 @@ public final class SFTPFileSystem: RemoteFileSystem, @unchecked Sendable {
     }
 
     public func copy(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
-    public func move(_ source: URL, to destination: URL) async throws { throw RemoteError.other("not supported") }
+    public func move(_ source: URL, to destination: URL) async throws {
+        _ = try await sftp("rename \(SFTPText.quote(path(source))) \(SFTPText.quote(path(destination)))")
+    }
     public func trash(_ url: URL) async throws -> URL? { throw RemoteError.other("not supported") }
 
     public func makeFolder(_ url: URL) async throws {

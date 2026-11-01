@@ -85,3 +85,9 @@ Symptom: one failure in 243 checks, gone on a re-run, with no change near it.
 Cause: Rename and the edit keys step aside while a text field has focus, which is right for the app. The check assumed no field had focus, and the window's first responder is up to the desktop at launch.
 Fix: the check clears the first responder before it looks.
 Rule: a check about what the app decides must set up every input that decision reads, including which control has focus.
+
+## `exists` said yes to any name on a server (S-065)
+Symptom: found while planning New Folder on S3: `FileOperations.makeFolder` asks `exists` for "New folder", "New folder (2)", and so on, until one is free.
+Cause: the server file systems answered `exists` with "listing it did not throw". S3 lists a name that is not there as an empty folder, so every name looked taken and the loop would never end.
+Fix: `exists` looks for the name in its parent's listing. A unit test lists an empty bucket and expects "not there".
+Rule: a question about one thing is answered by looking at that thing's own record, never by whether a broader call failed.

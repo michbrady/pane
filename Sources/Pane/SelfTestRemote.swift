@@ -76,11 +76,8 @@ extension SelfTest {
 
         model.tab.selection = Set(model.tab.items.prefix(1).map(\.url))
         model.actions.trashSelection()
-        check("changing files on a server is blocked, with a message", model.actions.alertMessage?.contains("later step") == true)
-        model.actions.alertMessage = nil
-        model.actions.newFolder()
-        check("so is New Folder", model.actions.alertMessage?.contains("later step") == true)
-        model.actions.alertMessage = nil
+        check("Delete on a server asks first, and has deleted nothing", model.actions.pendingDelete?.count == 1 && model.tab.items.count == 4)
+        model.actions.pendingDelete = nil
         check("no local file was touched by any of that", FileManager.default.fileExists(atPath: c.docs.appending(path: "Notes.txt").path))
 
         model.disconnect(serverKey: "sftp://nas")
@@ -294,11 +291,43 @@ extension SelfTest {
               && ((try? FileManager.default.contentsOfDirectory(atPath: desk.path)) ?? []).sorted() == ["report.pdf"])
         box.slowTransfers(by: .zero)
 
-        // changing files on a server is still S-065
+        // S-065 Change files on a server: New Folder, rename, and delete
         model.tab.go(to: place("/Inbox")); await settle()
         model.actions.newFolder()
-        check("New Folder on a server still waits for its own step", model.actions.alertMessage?.contains("later step") == true)
-        model.actions.alertMessage = nil
+        await idle()
+        check("New Folder on a server makes the folder and starts naming it",
+              box.paths().contains("/Inbox/New folder") && model.actions.renamingURL?.path == "/Inbox/New folder", "\(box.paths()) \(String(describing: model.actions.renamingURL))")
+        model.actions.renameText = "Reports"
+        model.actions.commitRename()
+        await idle()
+        check("renaming it renames it on the server", box.paths().contains("/Inbox/Reports") && !box.paths().contains("/Inbox/New folder"), "\(box.paths())")
+        model.tab.selection = [place("/Inbox/flaky.bin")]
+        check("F2 is available on a server's item", model.actions.canRename)
+        model.actions.beginRename()
+        model.actions.renameText = "keep.bin"
+        model.actions.commitRename()
+        await idle()
+        check("renaming a file keeps its bytes", box.data(at: "/Inbox/keep.bin") == Data(repeating: 3, count: 3000) && box.data(at: "/Inbox/flaky.bin") == nil)
+        model.tab.selection = [place("/Inbox/keep.bin")]
+        model.actions.beginRename()
+        model.actions.renameText = "big.bin"
+        model.actions.commitRename()
+        await Wait.until { model.actions.renameError != nil }
+        check("a name already taken on the server says so", model.actions.renameError == "An item with this name already exists.", model.actions.renameError ?? "nil")
+        model.actions.cancelRename()
+
+        model.tab.selection = [place("/Inbox/keep.bin"), place("/Inbox/big.bin"), place("/Inbox/Reports")]
+        model.actions.trashSelection()
+        check("Delete asks Delete 3 items from the server? with Delete and Cancel, and has deleted nothing",
+              model.actions.deleteTitle == "Delete 3 items from xfer?" && model.actions.deleteButtonTitle == "Delete" && box.data(at: "/Inbox/big.bin") != nil,
+              model.actions.deleteTitle)
+        model.actions.pendingDelete = nil
+        check("Cancel keeps everything", box.data(at: "/Inbox/big.bin") != nil && box.paths().contains("/Inbox/Reports"))
+        model.actions.trashSelection()
+        model.actions.deleteImmediately()
+        await idle()
+        check("Delete removes them from the server", box.data(at: "/Inbox/big.bin") == nil && box.data(at: "/Inbox/keep.bin") == nil && !box.paths().contains("/Inbox/Reports"), "\(box.paths())")
+        check("the list updates", model.tab.items.isEmpty, "\(model.tab.items.map(\.name))")
 
         model.disconnect(serverKey: "sftp://xfer")
         await settle()

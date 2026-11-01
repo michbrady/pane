@@ -534,7 +534,8 @@ Acceptance:
 - [unit] Each action calls the provider and the listing updates.
 - [self] Delete asks first: "Delete 3 items from <server>? This cannot be undone." with "Delete" and "Cancel", because remote places have no Trash.
 - [self] Rename and New folder use the same F2 and Cmd+Shift+N as local folders.
-Status: todo
+Note: New Folder, rename, and delete work on a server tab with the same keys as local folders. They run through the same `FileOperations` as local files, pointed at the server, so naming, "name already exists", and errors read the same. Delete always asks first (Delete key, Shift-Delete, and the toolbar), because a server has no Trash, and none of these register Undo. Rename is `rename` on SFTP, an in-folder `RNFR/RNTO` on FTP (moving to another folder on FTP says it is not supported yet), and on S3 a copy then a delete, key by key for a folder. `exists` on every server now checks the parent listing: before, it said "yes" for any name on S3, which would have stopped New Folder from ever finding a free name. [manual] Real servers; and a rename of a very large S3 folder, which copies every key.
+Status: done
 
 ### S-066 Open and edit a remote file
 As the user, I press Return on a remote file to open it, and changes I save go back to the server.

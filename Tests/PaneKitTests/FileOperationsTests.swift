@@ -1158,3 +1158,56 @@ private final class Collected2: @unchecked Sendable {
     #expect(log.values.suffix(2) == ["DELETE /photos/trip", "DELETE /photos/trip/"])
     await #expect(throws: RemoteError.self) { try await s3.upload(local, to: URL(string: "s3://s3.example.com/photos")!, replacing: false, progress: { _ in }) }
 }
+
+// MARK: Change files on a server (S-065)
+
+@Test func theSameFileOperationsWorkOnAServer() async throws {
+    let nas = InMemoryRemote(serverKey: "sftp://nas")
+    nas.add(folder: "/Docs"); nas.add(file: "/Docs/old.txt", contents: Data("body".utf8)); nas.add(file: "/Docs/b.txt", contents: Data("b".utf8))
+    let ops = FileOperations(nas)
+    let (first, _) = try await ops.makeFolder(in: serverURL("/Docs"))
+    let (second, _) = try await ops.makeFolder(in: serverURL("/Docs"))
+    #expect(RemoteURL.name(of: first) == "New folder" && RemoteURL.name(of: second) == "New folder (2)")
+    _ = try await ops.rename(serverURL("/Docs/old.txt"), to: "new name.txt")
+    #expect(nas.data(at: "/Docs/new name.txt") == Data("body".utf8) && nas.data(at: "/Docs/old.txt") == nil)
+    await #expect(throws: FileOperations.RenameError.taken) { _ = try await ops.rename(serverURL("/Docs/new name.txt"), to: "b.txt") }
+    let failures = await ops.deleteImmediately([serverURL("/Docs/b.txt"), serverURL("/Docs/New folder")])
+    #expect(failures.isEmpty && nas.data(at: "/Docs/b.txt") == nil && !nas.paths().contains("/Docs/New folder"))
+}
+
+private struct ListingStub: S3Transport {
+    let log: Collected2
+    let keys: [String]
+    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let path = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.percentEncodedPath ?? ""
+        log.add("\(request.httpMethod ?? "") \(path) \(request.value(forHTTPHeaderField: "x-amz-copy-source") ?? "")".trimmingCharacters(in: .whitespaces))
+        let body = request.httpMethod == "GET"
+            ? "<ListBucketResult><IsTruncated>false</IsTruncated>" + keys.map { "<Contents><Key>\($0)</Key><Size>1</Size></Contents>" }.joined() + "</ListBucketResult>"
+            : "<CopyObjectResult/>"
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+@Test func s3KnowsWhatIsThereAndRenamesByCopyingThenDeleting() async throws {
+    let log = Collected2()
+    let s3 = S3FileSystem(endpoint: "s3.example.com", region: "us-east-1", credentials: .init(accessKey: "k", secretKey: "s"),
+                          transport: ListingStub(log: log, keys: ["real.txt"]))
+    #expect(await s3.exists(URL(string: "s3://s3.example.com/photos/real.txt")!))
+    #expect(await s3.exists(URL(string: "s3://s3.example.com/photos/ghost.txt")!) == false, "an empty listing is not proof that the name is there")
+    let quiet = S3FileSystem(endpoint: "s3.example.com", region: "us-east-1", credentials: .init(accessKey: "k", secretKey: "s"),
+                             transport: ListingStub(log: log, keys: []))
+    try await quiet.move(URL(string: "s3://s3.example.com/photos/old%20name.txt")!, to: URL(string: "s3://s3.example.com/photos/new.txt")!)
+    let moves = log.values.suffix(2)
+    #expect(Array(moves) == ["PUT /photos/new.txt /photos/old%20name.txt", "DELETE /photos/old%20name.txt"])
+}
+
+@Test func sftpAndFtpRenameInPlace() async throws {
+    let runner = ScriptedRunner { _, _, _ in ProcessResult(stdout: "", stderr: "", status: 0) }
+    try await sftpSystem(runner).move(URL(string: "sftp://nas.local/My%20Docs/a")!, to: URL(string: "sftp://nas.local/My%20Docs/b")!)
+    #expect(runner.calls.last?.input == "rename \"/My Docs/a\" \"/My Docs/b\"\n")
+    let ftp = FTPFileSystem(host: "h", user: "me", password: "pw", secure: false, runner: runner)
+    try await ftp.move(URL(string: "ftp://h/Docs/a.txt")!, to: URL(string: "ftp://h/Docs/b.txt")!)
+    let config = try #require(runner.calls.last).input
+    #expect(config.contains("quote = \"-RNFR a.txt\"") && config.contains("quote = \"-RNTO b.txt\"") && config.contains("url = \"ftp://h/Docs/\""))
+    await #expect(throws: RemoteError.self) { try await ftp.move(URL(string: "ftp://h/Docs/a.txt")!, to: URL(string: "ftp://h/Other/a.txt")!) }
+}

@@ -103,6 +103,16 @@ public enum FileGrowth {
     }
 }
 
+extension RemoteTree {
+    /// Whether something is there: the name is in its folder's listing. A server's top always is.
+    /// (Listing the item itself would say yes for a name that is not there, on a server with no real folders.)
+    public static func exists(_ url: URL, in fs: FileSystem) async -> Bool {
+        guard let parent = RemoteURL.parent(of: url) else { return true }
+        let name = RemoteURL.name(of: url)
+        return ((try? await fs.list(parent)) ?? []).contains { $0.name == name }
+    }
+}
+
 /// Removing a folder takes emptying it first. Providers whose protocol has no recursive delete use this.
 public enum RemoteTree {
     public static func remove(_ url: URL, in fs: FileSystem, file: (URL) async throws -> Void, emptyFolder: (URL) async throws -> Void) async throws {
