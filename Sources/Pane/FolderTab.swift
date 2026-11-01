@@ -33,6 +33,11 @@ final class FolderTab: Identifiable {
     /// Spotlight, when the app has it. Tests leave it nil, so they scan.
     var spotlight: SpotlightSearching?
     private var searchTask: Task<Void, Never>?
+    /// Says whether a folder is on a network share. Tests swap it.
+    var isNetworkFolder: (URL) -> Bool = { VolumeInfo.isNetwork($0) }
+    /// Seconds between looks at the folder when it is on a share, or nil when the system tells us.
+    private(set) var pollInterval: TimeInterval?
+    private var pollTask: Task<Void, Never>?
     private let watcher = FolderWatcher()
     /// Whether the last listing included hidden items.
     private var listedHidden = false
@@ -134,6 +139,7 @@ final class FolderTab: Identifiable {
         selection = []
         didNavigate?()
         watcher.watch(currentFolder) { [weak self] in self?.scheduleReload() }
+        startPolling()
         reload()
     }
 
@@ -228,6 +234,19 @@ final class FolderTab: Identifiable {
             case .failure:
                 items = []
                 loadError = "Unable to read this folder."
+            }
+        }
+    }
+
+    /// A share does not report changes reliably, so look at it again every few seconds.
+    private func startPolling() {
+        pollTask?.cancel()
+        pollInterval = PollPolicy.interval(isLocal: !isNetworkFolder(currentFolder))
+        guard let interval = pollInterval else { pollTask = nil; return }
+        pollTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(interval))
+                if !Task.isCancelled { reload() }
             }
         }
     }

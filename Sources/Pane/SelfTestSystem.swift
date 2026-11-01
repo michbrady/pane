@@ -65,5 +65,33 @@ extension SelfTest {
         hotKey.unregister()
         hotKey.shortcut = saved
         hotKey.unregister()
+
+        // S-044 Browse network and iCloud: drives and shares
+        let backup = c.home.appending(path: "Volumes/Backup", directoryHint: .isDirectory)
+        let nas = c.home.appending(path: "Volumes/NAS", directoryHint: .isDirectory)
+        model.volumeSource = {
+            [VolumeInfo(url: backup, name: "Backup", isLocal: true, isEjectable: true),
+             VolumeInfo(url: nas, name: "NAS", isLocal: false, isEjectable: true)]
+        }
+        model.refreshVolumes()
+        check("a drive shows under This Mac", model.thisMacRoots.map(\.name).contains("Backup"), "\(model.thisMacRoots.map(\.name))")
+        check("a share shows under Network", model.networkRoots.map(\.name) == ["NAS"])
+        check("drives and shares can be ejected", model.driveRoots.first?.ejectable == true && model.networkRoots.first?.ejectable == true)
+        check("the home folder cannot be ejected", model.homeRoot.ejectable == false)
+        model.tab.isNetworkFolder = { $0.path.contains("/Volumes/NAS") }
+        model.tab.go(to: nas)
+        await settle()
+        check("opening a share selects its row under Network", model.navSelection == "net:" + nas.standardizedFileURL.path, model.navSelection ?? "nil")
+        check("a network folder is looked at again every ten seconds", model.tab.pollInterval == 10)
+        model.tab.go(to: backup)
+        await settle()
+        check("a drive's row is selected under This Mac", model.navSelection == "vol:" + backup.standardizedFileURL.path, model.navSelection ?? "nil")
+        check("a local folder is not polled", model.tab.pollInterval == nil)
+        model.volumeSource = { [] }
+        model.refreshVolumes()
+        check("an ejected share leaves the tree", model.networkRoots.isEmpty && !model.thisMacRoots.map(\.name).contains("Backup"))
+        model.tab.isNetworkFolder = { VolumeInfo.isNetwork($0) }
+        model.tab.go(to: c.docs)
+        await settle()
     }
 }

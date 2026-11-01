@@ -1,5 +1,6 @@
 import AppKit
 import IOKit.pwr_mgt
+import PaneKit
 import SwiftUI
 
 /// Screenshot mode for agents.
@@ -12,7 +13,7 @@ import SwiftUI
 enum Snapshot {
     /// The views to capture. Add a case when a story adds a view.
     enum Page: String, CaseIterable {
-        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
+        case window, tree, addressEdit = "address-edit", addressError = "address-error", emptyFolder = "empty-folder", progress, cut, conflict, deleteConfirm = "delete-confirm", rename, sorted, tabs, list, icons, columns, properties, preview, network, onboarding, search, searchEmpty = "search-empty", previewImage = "preview-image", previewPDF = "preview-pdf"
 
         @MainActor func show(in model: AppModel) {
             let home = Locations.home
@@ -25,6 +26,7 @@ enum Snapshot {
             model.tab.endSearch(reload: false)
             model.closeProperties()
             model.dismissFullDiskAccessGuide()
+            if self != .network { model.volumeSource = { [] }; model.refreshVolumes() }
             model.closeOtherTabs(except: model.tab)
             switch self {
             case .window:
@@ -99,6 +101,15 @@ enum Snapshot {
                     try? await Task.sleep(for: .milliseconds(300))
                     model.tab.selection = Set(model.tab.items.filter { $0.name == name }.map(\.url))
                 }
+            case .network:
+                let backup = home.appending(path: "Volumes/Backup", directoryHint: .isDirectory)
+                let nas = home.appending(path: "Volumes/NAS", directoryHint: .isDirectory)
+                model.volumeSource = {
+                    [VolumeInfo(url: backup, name: "Backup", isLocal: true, isEjectable: true),
+                     VolumeInfo(url: nas, name: "photos on nas", isLocal: false, isEjectable: true)]
+                }
+                model.refreshVolumes()
+                model.tab.go(to: nas)
             case .onboarding:
                 model.tab.go(to: home.appending(path: "Documents", directoryHint: .isDirectory))
                 model.showFullDiskAccessGuideForSnapshot()

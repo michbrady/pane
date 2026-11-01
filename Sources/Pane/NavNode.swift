@@ -7,12 +7,15 @@ final class NavNode: Identifiable {
     let id: String
     let url: URL
     let name: String
+    /// True for an external drive or a share: the row shows an eject button.
+    let ejectable: Bool
     private let prefix: String
     private var loaded = false
     private var cached: [NavNode]?
 
     /// `prefix` keeps ids apart when one folder shows in two places ("quick:", "home:", "vol:").
-    init(url: URL, prefix: String, name: String? = nil) {
+    init(url: URL, prefix: String, name: String? = nil, ejectable: Bool = false) {
+        self.ejectable = ejectable
         self.url = url.standardizedFileURL
         self.prefix = prefix
         self.id = prefix + self.url.path

@@ -411,9 +411,10 @@ Screens: tree
 Depends: S-007
 Acceptance:
 - [self] Drives and shares show under This Mac and Network.
-- [self] iCloud placeholders show a cloud icon and download on open.
+- (The iCloud placeholder and download line moved to S-048, which says the same thing for every cloud folder.)
 - [unit] Network folders refresh by polling every ten seconds.
-Status: todo
+Note: drives and shares come from the system's mounted volumes and refresh when one mounts, unmounts, or is renamed. The tests use a fake list, so mounting a real drive or share and pressing eject need a hand test [manual]. An eject of a busy volume shows "Items are in use."
+Status: done
 
 ### S-046 Connect to an SMB server
 As the user, I choose Go > Connect to Server…, type `smb://nas/photos`, enter my name and password once, and the share appears in the tree.

@@ -468,6 +468,28 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(decoded == shortcut)
 }
 
+@Test func volumesSplitIntoDrivesAndNetworkShares() {
+    let root = VolumeInfo(url: URL(fileURLWithPath: "/"), name: "Macintosh HD", isLocal: true, isEjectable: false)
+    let backup = VolumeInfo(url: URL(fileURLWithPath: "/Volumes/Backup"), name: "Backup", isLocal: true, isEjectable: true)
+    let archive = VolumeInfo(url: URL(fileURLWithPath: "/Volumes/Archive"), name: "Archive", isLocal: true, isEjectable: true)
+    let nas = VolumeInfo(url: URL(fileURLWithPath: "/Volumes/photos"), name: "photos", isLocal: false, isEjectable: true)
+    let split = VolumeSections.split([nas, backup, root, archive])
+    #expect(split.drives.map(\.name) == ["Macintosh HD", "Archive", "Backup"])
+    #expect(split.network.map(\.name) == ["photos"])
+}
+
+@Test func networkFoldersArePolledAndLocalOnesAreNot() {
+    #expect(PollPolicy.interval(isLocal: false) == 10)
+    #expect(PollPolicy.interval(isLocal: true) == nil)
+    #expect(!VolumeInfo.isNetwork(FileManager.default.temporaryDirectory))
+}
+
+@Test func mountedVolumesIncludeTheStartupDisk() {
+    let volumes = VolumeInfo.mounted()
+    #expect(volumes.contains { $0.url.path == "/" && $0.isLocal })
+    #expect(!volumes.contains { $0.url.path.hasPrefix("/System/Volumes") })
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

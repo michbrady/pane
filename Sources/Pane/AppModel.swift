@@ -36,7 +36,12 @@ final class AppModel {
     // Navigation pane
     private(set) var quickRoots: [NavNode]
     private var pins: PinStore
-    let thisMacRoots: [NavNode]
+    let homeRoot: NavNode
+    private(set) var driveRoots: [NavNode] = []
+    private(set) var networkRoots: [NavNode] = []
+    var thisMacRoots: [NavNode] { [homeRoot] + driveRoots }
+    /// Where the mounted volumes come from. Tests use a fake list, so they see the same on every Mac.
+    var volumeSource: () -> [VolumeInfo] = { Locations.isOverridden ? [] : VolumeInfo.mounted() }
     var expanded: Set<String> {
         didSet { Prefs.defaults.set(Array(expanded), forKey: "pane.expanded") }
     }
@@ -60,8 +65,7 @@ final class AppModel {
         let store = PinStore(saved: defaults.array(forKey: "pane.pins") as? [Data], defaults: Locations.quickAccess)
         pins = store
         quickRoots = store.urls.map { NavNode(url: $0, prefix: "quick:") }
-        thisMacRoots = [NavNode(url: Locations.home, prefix: "home:")]
-            + Locations.volumes.map { NavNode(url: $0, prefix: "vol:") }
+        homeRoot = NavNode(url: Locations.home, prefix: "home:")
         expanded = Set(defaults.stringArray(forKey: "pane.expanded") ?? [])
 
         let env = ProcessInfo.processInfo.environment
@@ -85,6 +89,15 @@ final class AppModel {
         activeIndex = active
         for tab in tabs { tab.begin() }
         activated()
+        refreshVolumes()
+        if !Locations.isOverridden {
+            // A drive or share appeared, went away, or was renamed.
+            for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification, NSWorkspace.didRenameVolumeNotification] {
+                NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.refreshVolumes() }
+                }
+            }
+        }
         GlobalHotKey.shared.onPress = { [unowned self] in globalShortcutPressed() }
         GlobalHotKey.shared.start()
         // Tests and snapshots never ask. A person gets the screen once, if Pane lacks access.
@@ -266,15 +279,41 @@ final class AppModel {
     /// Expands the folders above the current one and selects its row.
     private func syncTree() {
         let url = tab.currentFolder
+        // The root that holds this folder: the home folder, a drive, or a share. The deepest one wins.
+        let roots: [(prefix: String, path: String)] =
+            [("home:", Locations.home.path)] + driveRoots.map { ("vol:", $0.url.path) } + networkRoots.map { ("net:", $0.url.path) } + [("vol:", "/")]
+        let holder = roots.filter { url.path == $0.path || url.path.hasPrefix($0.path == "/" ? "/" : $0.path + "/") }
+            .max { $0.path.count < $1.path.count } ?? ("vol:", "/")
         let pinned = quickRoots.contains { $0.url.path == url.path }
-        let homePath = Locations.home.path
-        let underHome = url.path == homePath || url.path.hasPrefix(homePath + "/")
-        let prefix = underHome ? "home:" : "vol:"
-        navSelection = pinned ? "quick:" + url.path : prefix + url.path
-        let floor = underHome ? homePath : "/"
+        navSelection = pinned ? "quick:" + url.path : holder.prefix + url.path
         for ancestor in Breadcrumbs.chain(for: url).dropLast()
-        where ancestor.path.count >= floor.count && (ancestor.path == floor || ancestor.path.hasPrefix(floor == "/" ? "/" : floor + "/")) {
-            expanded.insert(prefix + ancestor.path)
+        where ancestor.path.count >= holder.path.count && (ancestor.path == holder.path || ancestor.path.hasPrefix(holder.path == "/" ? "/" : holder.path + "/")) {
+            expanded.insert(holder.prefix + ancestor.path)
+        }
+    }
+
+    // MARK: Drives and shares
+
+    /// Reads the mounted volumes again: drives go under This Mac and shares under Network.
+    func refreshVolumes() {
+        let sections = VolumeSections.split(volumeSource())
+        driveRoots = sections.drives.map { NavNode(url: $0.url, prefix: "vol:", name: $0.name, ejectable: $0.isEjectable) }
+        networkRoots = sections.network.map { NavNode(url: $0.url, prefix: "net:", name: $0.name, ejectable: true) }
+        syncTree()
+    }
+
+    /// The eject button beside a drive or share. A busy volume says so and stays.
+    func eject(_ node: NavNode) {
+        let url = node.url
+        let name = node.name
+        if tab.currentFolder.path.hasPrefix(url.path) { tab.go(to: Locations.home) }
+        Task {
+            do {
+                try await Task.detached { try NSWorkspace.shared.unmountAndEjectDevice(at: url) }.value
+            } catch {
+                actions.alertMessage = "Unable to eject \u{201C}\(name)\u{201D}. Items are in use."
+            }
+            refreshVolumes()
         }
     }
 

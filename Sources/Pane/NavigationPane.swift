@@ -17,6 +17,11 @@ struct NavigationPane: View {
             Section("This Mac") {
                 ForEach(model.thisMacRoots) { NavRow(node: $0) }
             }
+            if !model.networkRoots.isEmpty {
+                Section("Network") {
+                    ForEach(model.networkRoots) { NavRow(node: $0) }
+                }
+            }
         }
         .onChange(of: model.navSelection) { _, id in
             guard let id, let url = AppModel.url(forNavID: id), url != model.tab.currentFolder else { return }
@@ -42,6 +47,21 @@ private struct NavRow: View {
     }
 
     private var label: some View {
+        HStack(spacing: Space.xs) {
+            rowLabel
+            if node.ejectable {
+                Spacer(minLength: 0)
+                Button("Eject", systemImage: "eject.fill") { model.eject(node) }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Eject \(node.name)")
+            }
+        }
+        .tag(node.id)
+    }
+
+    private var rowLabel: some View {
         Label {
             Text(node.name)
         } icon: {
@@ -49,7 +69,6 @@ private struct NavRow: View {
                 .resizable()
                 .frame(width: Layout.rowIcon, height: Layout.rowIcon)
         }
-        .tag(node.id)
         .acceptsFileDrops(into: node.url, model: model)
         .onMiddleClick { model.newTab(at: node.url) }
         .contextMenu {

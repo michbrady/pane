@@ -3,11 +3,13 @@
 set -eu
 home=${1:?usage: make-fixture.sh <dir>}
 rm -rf "$home"
-mkdir -p "$home"/{Desktop,Downloads,Pictures,Music,Empty} "$home"/Documents/{Work,Personal,"Tax Returns"}
+mkdir -p "$home"/{Desktop,Downloads,Pictures,Music,Empty} "$home"/Volumes/{Backup,NAS} "$home"/Documents/{Work,Personal,"Tax Returns"}
 file() { # path size-in-KB date
   mkdir -p "${1:h}"; dd if=/dev/zero of="$1" bs=1024 count="$2" 2>/dev/null; touch -t "$3" "$1"
 }
 d="$home/Documents"
+file "$home/Volumes/Backup/Archive.zip" 20 202610010900
+file "$home/Volumes/NAS/Holiday.mov" 40 202610020900
 file "$d/Quarterly review.docx" 48 202610211430
 file "$d/Budget 2026.xlsx" 112 202610150915
 file "$d/Trip itinerary.pdf" 1840 202609300800

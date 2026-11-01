@@ -24,15 +24,6 @@ enum Locations {
             .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    /// The startup disk and any mounted drives. Tests list none, to stay the same on every Mac.
-    static var volumes: [URL] {
-        guard !isOverridden else { return [] }
-        let mounted = FileManager.default.mountedVolumeURLs(
-            includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
-        let others = mounted.map(\.standardizedFileURL).filter { $0.path != "/" && !$0.path.hasPrefix("/System/Volumes") }
-        return [URL(fileURLWithPath: "/")] + others
-    }
-
     static func displayName(for url: URL) -> String {
         if url.path == "/" { return FileManager.default.displayName(atPath: "/") }
         if url.path == home.path, !isOverridden { return NSUserName() }
