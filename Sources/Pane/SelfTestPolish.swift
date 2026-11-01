@@ -105,6 +105,8 @@ extension SelfTest {
         await Wait.until { !model.actions.isBusy }
         await settle()
         model.actions.cancelRename()
+        await settle()
+        NSApp.keyWindow?.makeFirstResponder(nil)   // a cancelled rename field can keep focus, and Delete steps aside for a field
         check("a new folder shows in the tree at once", treeNames().contains("New folder"), "\(treeNames())")
         let made = model.tab.items.first { $0.name == "New folder" }
         if let made {
@@ -114,10 +116,12 @@ extension SelfTest {
             await settle()
         }
         check("a deleted folder leaves the tree", !treeNames().contains("New folder") && treeNames().contains("Work"), "\(treeNames())")
+        NSApp.keyWindow?.makeFirstResponder(nil)
         model.actions.undoManager.undo()
         await Wait.until { !model.actions.isBusy }
         await settle()
         check("and Undo puts it back", treeNames().contains("New folder"), "\(treeNames())")
+        NSApp.keyWindow?.makeFirstResponder(nil)
         if let again = model.tab.items.first(where: { $0.name == "New folder" }) {
             model.tab.selection = [again.url]
             model.actions.trashSelection()
@@ -133,5 +137,33 @@ extension SelfTest {
         model.tab.reload()
         await Wait.until { !treeNames().contains("Made elsewhere") }
         check("and leaves it when it is removed", !treeNames().contains("Made elsewhere"))
+
+        // Show in Pane (the Services menu entry other apps offer)
+        let service = ShowInPaneService()
+        let received = ShownLog()
+        service.open = { received.urls = $0 }
+        let board = NSPasteboard(name: NSPasteboard.Name("com.michaelbrady.pane.service-test"))
+        board.clearContents()
+        board.writeObjects([c.docs.appending(path: "Notes.txt") as NSURL])
+        var failure: NSString = ""
+        service.showInPane(board, userData: "", error: &failure)
+        check("Show in Pane takes the files on the pasteboard", received.urls.map(\.lastPathComponent) == ["Notes.txt"], "\(received.urls)")
+        board.clearContents()
+        board.setString("see \(c.docs.path)\n\(c.docs.path)/Notes.txt", forType: .string)
+        received.urls = []
+        service.showInPane(board, userData: "", error: &failure)
+        check("and the paths in selected text that exist, and only those", received.urls.map(\.path) == ["\(c.docs.path)/Notes.txt"], "\(received.urls.map(\.path))")
+        board.clearContents()
+        board.setString("nothing to show", forType: .string)
+        received.urls = []
+        service.showInPane(board, userData: "", error: &failure)
+        check("text with no path says so and shows nothing", received.urls.isEmpty && failure == "Pane found no file or folder in that.", "\(failure)")
+        model.openFromOutside([c.docs.appending(path: "Notes.txt")])
+        await settle()
+        check("a file from outside shows in its folder, selected", model.tab.currentFolder.standardizedFileURL.path == c.docs.standardizedFileURL.path && model.tab.selectedItems.map(\.name) == ["Notes.txt"])
     }
+}
+
+private final class ShownLog {
+    var urls: [URL] = []
 }

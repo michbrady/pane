@@ -115,3 +115,9 @@ Symptom: after deleting or making a folder, the tree on the left kept showing th
 Cause: each tree row lists its subfolders once and keeps the list. Nothing told it to look again.
 Fix: after any listing of a folder on this Mac, and after any file operation, Undo, or Redo, the rows for the changed folders list again. Open rows stay open, because a row's id is its path. The check compares paths with links resolved, since /tmp and /private/tmp are one folder.
 Rule: a cached list needs a named event that clears it. When a cache is added, add the clear in the same change.
+
+## The Show in Pane test passed or failed on leftover focus (nav refresh test)
+Symptom: after a New Folder and a cancelled rename, Delete did nothing, and the tree check failed with the folder still on disk.
+Cause: the cancelled rename field kept focus, and Delete steps aside for a focused field. A change elsewhere in the run shifted the timing enough to show it.
+Fix: the test clears focus after every cancelled rename and before each Delete or Undo.
+Rule: third time. Any self-test step that follows a rename starts with `makeFirstResponder(nil)`. Put it in a helper if it comes up again.

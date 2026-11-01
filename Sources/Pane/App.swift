@@ -137,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         didSet { if let onOpen, !pending.isEmpty { onOpen(pending); pending = [] } }
     }
     private var pending: [URL] = []
+    private let showInPane = ShowInPaneService()
 
     override init() {
         super.init()
@@ -149,6 +150,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // The Services menu entry "Show in Pane", for apps that offer Services on files or on selected text.
+        NSApp.servicesProvider = showInPane
+        NSUpdateDynamicServices()
         // Started from a terminal, the process is not a foreground app yet.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()

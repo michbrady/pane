@@ -122,3 +122,9 @@ private func makeTree() throws -> URL {
     #expect(RubberBand.selection(in: CGRect(x: 92, y: 92, width: 5, height: 5), frames: frames, base: [], additive: false).isEmpty, "a box in the gap touches nothing")
     #expect(!RubberBand.isDrag(from: .zero, to: CGPoint(x: 2, y: 1)) && RubberBand.isDrag(from: .zero, to: CGPoint(x: 5, y: 0)))
 }
+
+@Test func theShowInPaneServiceReadsPathsFromText() {
+    let urls = ServicePaths.urls(fromText: "  /Users/me/Docs/a b.txt \n~/Desktop\n\"/tmp/q\"\nfile:///tmp/x%20y\nhello world\nhttps://example.com\n\n~", home: "/Users/me")
+    #expect(urls.map(\.path) == ["/Users/me/Docs/a b.txt", "/Users/me/Desktop", "/tmp/q", "/tmp/x y", "/Users/me"])
+    #expect(ServicePaths.urls(fromText: "no paths here", home: "/h").isEmpty)
+}
