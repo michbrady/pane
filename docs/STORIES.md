@@ -426,7 +426,8 @@ Acceptance:
 - [manual] Connecting mounts the share through `NetFS`, and the new share shows under Network and opens on Return.
 - [unit] An address without `smb://` is rejected, and spaces and special characters in names are encoded.
 - [self] Recent servers show in a list in the sheet, and the list can be cleared.
-Status: todo
+Note: address parsing and encoding, the recent list, the plain-language errors, and the whole flow (reject, mount, close, show, save, fall back to a saved password, refuse, cancel) are tested against a fake mount and Keychain. Mounting a real SMB share through the system and saving to your real Keychain need a hand test [manual]: open Go > Connect to Server (Command-K) and connect to a share you have.
+Status: done
 
 ### S-047 Disconnect a share or eject a drive
 As the user, I click the eject icon beside a share or drive in the tree to disconnect it.

@@ -551,6 +551,54 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     try await CloudDownload.materialize(file)
 }
 
+@Test func anSMBAddressNeedsTheSMBScheme() {
+    #expect(SMBAddress.parse("") == .failure(.empty))
+    #expect(SMBAddress.parse("   ") == .failure(.empty))
+    #expect(SMBAddress.parse("nas/photos") == .failure(.notSMB))
+    #expect(SMBAddress.parse("http://nas/photos") == .failure(.notSMB))
+    #expect(SMBAddress.parse("smb://") == .failure(.noHost))
+    #expect(SMBAddress.parse("smb:///photos") == .failure(.noHost))
+}
+
+@Test func anSMBAddressSplitsIntoHostAndShare() throws {
+    let address = try SMBAddress.parse("  SMB://nas.local/photos/2026 ").get()
+    #expect(address.host == "nas.local" && address.path == ["photos", "2026"] && address.user == nil)
+    #expect(address.url.absoluteString == "smb://nas.local/photos/2026")
+    #expect(address.displayText == "smb://nas.local/photos/2026")
+    let hostOnly = try SMBAddress.parse("smb://nas").get()
+    #expect(hostOnly.path.isEmpty && hostOnly.url.absoluteString == "smb://nas")
+}
+
+@Test func spacesAndSpecialCharactersAreEncoded() throws {
+    let spaced = try SMBAddress.parse("smb://nas/My Photos/Summer #1").get()
+    #expect(spaced.path == ["My Photos", "Summer #1"])
+    #expect(spaced.url.absoluteString == "smb://nas/My%20Photos/Summer%20%231")
+    let encoded = try SMBAddress.parse("smb://nas/My%20Photos").get()
+    #expect(encoded.path == ["My Photos"] && encoded.url.absoluteString == "smb://nas/My%20Photos")
+    let named = try SMBAddress.parse("smb://me@nas/share").get()
+    #expect(named.user == "me" && named.host == "nas" && named.url.absoluteString == "smb://me@nas/share")
+}
+
+@Test func recentServersKeepTheNewestFirstWithoutRepeats() {
+    var recent = RecentServers()
+    recent.add("smb://nas/photos")
+    recent.add("smb://backup/files")
+    recent.add("SMB://NAS/photos")
+    #expect(recent.items == ["SMB://NAS/photos", "smb://backup/files"])
+    for n in 0..<10 { recent.add("smb://host\(n)/share") }
+    #expect(recent.items.count == RecentServers.limit && recent.items.first == "smb://host9/share")
+    recent.clear()
+    #expect(recent.items.isEmpty)
+}
+
+@Test func connectionErrorsAreExplainedInPlainWords() {
+    #expect(ConnectionError.message(forCode: 80) == "The name or password was not accepted.")
+    #expect(ConnectionError.message(forCode: 2).contains("no share with that name"))
+    #expect(ConnectionError.message(forCode: 60).contains("did not answer"))
+    #expect(ConnectionError.message(forCode: 17) == "That share is already connected.")
+    #expect(ConnectionError.message(forCode: 999) == "Unable to connect (error 999).")
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }
