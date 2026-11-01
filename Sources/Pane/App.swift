@@ -127,6 +127,23 @@ struct PaneApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static weak var shared: AppDelegate?
+    /// Set once the window exists. Items other apps asked Pane to open before then wait in `pending`.
+    var onOpen: (([URL]) -> Void)? {
+        didSet { if let onOpen, !pending.isEmpty { onOpen(pending); pending = [] } }
+    }
+    private var pending: [URL] = []
+
+    override init() {
+        super.init()
+        AppDelegate.shared = self
+    }
+
+    /// Another app (or Show in Finder, when Pane opens folders) asked Pane to open these.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let onOpen { onOpen(urls) } else { pending += urls }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Started from a terminal, the process is not a foreground app yet.
         NSApp.setActivationPolicy(.regular)

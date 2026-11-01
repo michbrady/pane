@@ -51,6 +51,7 @@ struct ContentView: View {
         }
         .background(FrameAutosave(name: "PaneMain"))
         .task {
+            AppDelegate.shared?.onOpen = { urls in model.openFromOutside(urls) }
             SelfTest.runIfRequested(model: model)
             Snapshot.runIfRequested(model: model, openSettings: openSettings)
         }

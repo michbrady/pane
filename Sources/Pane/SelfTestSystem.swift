@@ -196,6 +196,46 @@ extension SelfTest {
         check("Clear Recents empties the list", model.recentServers.items.isEmpty)
         model.tab.go(to: c.docs)
         await settle()
+
+        // S-042 Open from other apps in Pane (an in-memory stand-in, never the real settings)
+        check("the self-test uses an in-memory stand-in for the folder settings", model.folderHandlerSystem is InMemoryFolderHandlerSystem)
+        let system = InMemoryFolderHandlerSystem(viewer: "com.cocoatech.PathFinder", handler: "com.apple.finder")
+        model.folderHandlerSystem = system
+        check("Use Pane to open folders starts off", !model.usePaneForFolders)
+        await model.setUsePaneForFolders(true)
+        check("turning it on makes Pane the folder app", model.usePaneForFolders && system.viewer == Bundle.main.bundleIdentifier && system.handler == Bundle.main.bundleIdentifier,
+              "\(system.viewer ?? "nil") \(system.handler ?? "nil")")
+        check("the setting is saved", ViewSettingsProbe.handlerStateIsSaved)
+        await model.setUsePaneForFolders(false)
+        check("turning it off puts back the earlier apps",
+              !model.usePaneForFolders && system.viewer == "com.cocoatech.PathFinder" && system.handler == "com.apple.finder")
+        model.folderHandlerSystem = InMemoryFolderHandlerSystem()
+        let outsideFolder = c.docs.appending(path: "Work", directoryHint: .isDirectory)
+        model.openFromOutside([outsideFolder])
+        await settle()
+        check("a folder another app opens is shown", model.tab.currentFolder.path == outsideFolder.standardizedFileURL.path)
+        let outsideFile = c.docs.appending(path: "Notes.txt")
+        model.openFromOutside([outsideFile])
+        await Wait.until { model.tab.selectedItems.first?.name == "Notes.txt" }
+        check("a file another app reveals is shown in its folder, selected",
+              model.tab.currentFolder.path == c.docs.standardizedFileURL.path && model.tab.selectedItems.first?.name == "Notes.txt",
+              "\(model.tab.currentFolder.lastPathComponent) \(model.tab.selectedItems.map(\.name))")
+        let tabsBeforeOutside = model.tabs.count
+        model.openFromOutside([c.docs, outsideFolder])
+        await settle()
+        check("a second item opens in a tab of its own", model.tabs.count == tabsBeforeOutside + 1)
+        model.closeOtherTabs(except: model.tabs[0])
+        model.openFromOutside([c.docs.appending(path: "No such thing")])
+        check("something that is not there is ignored", true)
+        model.tab.go(to: c.docs)
+        await settle()
+    }
+}
+
+/// Reads back what Pane saved about the folder setting.
+private enum ViewSettingsProbe {
+    static var handlerStateIsSaved: Bool {
+        (Prefs.defaults.data(forKey: "pane.folderHandlerState")).flatMap { try? JSONDecoder().decode(FolderHandlerState.self, from: $0) }?.isOn == true
     }
 }
 

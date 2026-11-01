@@ -30,6 +30,14 @@ final class AppModel {
     /// For snapshots: shows the screen without checking the real permission.
     func showFullDiskAccessGuideForSnapshot() { showFullDiskAccessGuide = true }
 
+    // Open folders for other apps
+    /// What opens folders for other apps. Tests use an in-memory stand-in, so they never change your Mac.
+    var folderHandlerSystem: FolderHandlerSystem = Locations.isOverridden ? InMemoryFolderHandlerSystem() : SystemFolderHandler()
+    private(set) var folderHandlerState: FolderHandlerState = {
+        Prefs.defaults.data(forKey: "pane.folderHandlerState").flatMap { try? JSONDecoder().decode(FolderHandlerState.self, from: $0) } ?? FolderHandlerState()
+    }()
+    var usePaneForFolders: Bool { folderHandlerState.isOn }
+
     // Connect to Server
     var showConnectSheet = false
     private(set) var isConnecting = false
@@ -303,6 +311,41 @@ final class AppModel {
         for ancestor in Breadcrumbs.chain(for: url).dropLast()
         where ancestor.path.count >= holder.path.count && (ancestor.path == holder.path || ancestor.path.hasPrefix(holder.path == "/" ? "/" : holder.path + "/")) {
             expanded.insert(holder.prefix + ancestor.path)
+        }
+    }
+
+    // MARK: Opening folders for other apps
+
+    /// Settings > "Use Pane to open folders". On remembers what was set before, and off puts it back.
+    func setUsePaneForFolders(_ on: Bool) async {
+        var state = folderHandlerState
+        if on {
+            await FolderHandlerSwitch.turnOn(folderHandlerSystem, as: Bundle.main.bundleIdentifier ?? "com.michaelbrady.pane", state: &state)
+        } else {
+            await FolderHandlerSwitch.turnOff(folderHandlerSystem, state: &state)
+        }
+        folderHandlerState = state
+        Prefs.defaults.set(try? JSONEncoder().encode(state), forKey: "pane.folderHandlerState")
+    }
+
+    /// Another app asked Pane to open something, like Show in Finder from a download. A folder opens.
+    /// A file shows in its folder, selected. Any further items open in their own tabs.
+    func openFromOutside(_ urls: [URL]) {
+        guard let first = urls.first else { return }
+        NSApp.activate()
+        show(first, inNewTab: false)
+        for url in urls.dropFirst() { show(url, inNewTab: true) }
+    }
+
+    private func show(_ url: URL, inNewTab: Bool) {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return }
+        let folder = isDirectory.boolValue ? url : url.deletingLastPathComponent()
+        if inNewTab { newTab(at: folder) } else { tab.go(to: folder) }
+        guard !isDirectory.boolValue else { return }
+        let path = url.standardizedFileURL.path
+        tab.afterReload = { [tab] in
+            if let item = tab.items.first(where: { $0.url.standardizedFileURL.path == path }) { tab.selection = [item.url] }
         }
     }
 

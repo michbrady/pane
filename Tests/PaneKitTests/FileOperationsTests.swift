@@ -599,6 +599,56 @@ private func collect(_ text: String, in root: URL, spotlight: SpotlightSearching
     #expect(ConnectionError.message(forCode: 999) == "Unable to connect (error 999).")
 }
 
+@MainActor @Test func pickingPaneAsTheFolderAppRemembersWhatWasThere() async {
+    let system = InMemoryFolderHandlerSystem(viewer: "com.cocoatech.PathFinder", handler: "com.apple.finder")
+    var state = FolderHandlerState()
+    await FolderHandlerSwitch.turnOn(system, as: "com.michaelbrady.pane", state: &state)
+    #expect(system.viewer == "com.michaelbrady.pane" && system.handler == "com.michaelbrady.pane")
+    #expect(state.isOn && state.previousFileViewer == "com.cocoatech.PathFinder" && state.previousFolderHandler == "com.apple.finder")
+}
+
+@MainActor @Test func turningItOffPutsTheEarlierAppsBack() async {
+    let system = InMemoryFolderHandlerSystem(viewer: "com.cocoatech.PathFinder", handler: "com.apple.finder")
+    var state = FolderHandlerState()
+    await FolderHandlerSwitch.turnOn(system, as: "com.michaelbrady.pane", state: &state)
+    await FolderHandlerSwitch.turnOff(system, state: &state)
+    #expect(system.viewer == "com.cocoatech.PathFinder" && system.handler == "com.apple.finder")
+    #expect(state == FolderHandlerState())
+}
+
+@MainActor @Test func turningItOnTwiceKeepsTheFirstMemory() async {
+    let system = InMemoryFolderHandlerSystem(viewer: nil, handler: "com.apple.finder")
+    var state = FolderHandlerState()
+    await FolderHandlerSwitch.turnOn(system, as: "com.michaelbrady.pane", state: &state)
+    await FolderHandlerSwitch.turnOn(system, as: "com.michaelbrady.pane", state: &state)
+    #expect(state.previousFileViewer == nil && state.previousFolderHandler == "com.apple.finder")
+    await FolderHandlerSwitch.turnOff(system, state: &state)
+    #expect(system.viewer == nil && system.handler == "com.apple.finder")
+}
+
+@MainActor @Test func turningOffWhenNeverOnChangesNothing() async {
+    let system = InMemoryFolderHandlerSystem(viewer: "x.y.z", handler: "a.b.c")
+    var state = FolderHandlerState()
+    await FolderHandlerSwitch.turnOff(system, state: &state)
+    #expect(system.viewer == "x.y.z" && system.handler == "a.b.c")
+}
+
+@MainActor @Test func withNothingRememberedOffFallsBackToFinder() async {
+    let system = InMemoryFolderHandlerSystem(viewer: nil, handler: nil)
+    var state = FolderHandlerState()
+    await FolderHandlerSwitch.turnOn(system, as: "com.michaelbrady.pane", state: &state)
+    await FolderHandlerSwitch.turnOff(system, state: &state)
+    #expect(system.viewer == nil && system.handler == FolderHandlerSwitch.finder)
+}
+
+@Test func theRememberedStateSurvivesSaving() throws {
+    var state = FolderHandlerState()
+    state.isOn = true
+    state.previousFileViewer = "com.cocoatech.PathFinder"
+    let decoded = try JSONDecoder().decode(FolderHandlerState.self, from: JSONEncoder().encode(state))
+    #expect(decoded == state)
+}
+
 private actor Counter {
     var value = 0
     func bump() { value += 1 }

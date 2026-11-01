@@ -68,6 +68,13 @@ struct GeneralSettings: View {
         Section("Folders") {
             Toggle("Show folders first", isOn: $view.foldersFirst)
         }
+        Section("Open folders") {
+            Toggle("Use Pane to open folders", isOn: Binding(
+                get: { model.usePaneForFolders },
+                set: { on in Task { await model.setUsePaneForFolders(on) } }))
+            Text("Folders other apps open, like Show in Finder from a download, open in Pane. Finder still handles the Desktop and the Trash. If Finder still opens one, turn this off and on again. Turning it off puts back what was set before.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
         Section("Permissions") {
             LabeledContent("Full Disk Access") {
                 HStack(spacing: Space.sm) {

@@ -394,7 +394,8 @@ Acceptance:
 - [self] Revealing a file from Safari's downloads opens Pane with it selected.
 - [self] Turning it off restores the earlier handler.
 - [manual] The setting survives a reboot. [U] See the research file.
-Status: todo
+Note: the switch is off by default. Turning it on remembers the earlier file viewer and folder app, and off puts them back. That logic, and Pane opening a folder or revealing a file when another app asks, are tested against an in-memory stand-in. The tests never change the real settings, and I did not turn the real switch on. Whether macOS 26 still sends Show in Finder to Pane after a reboot or a Launch Services rebuild is unconfirmed [U] and needs a hand test [manual]: turn the switch on, then use Show in Finder in Safari's downloads.
+Status: done
 
 ### S-043 Open Pane with a global shortcut
 As the user, I press a global shortcut (default Control+Option+E) to open a new Pane window.
