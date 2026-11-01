@@ -152,28 +152,95 @@ struct NameCell: View {
     }
 }
 
-/// The context menu for items, in every view mode.
-/// A menu is built outside the view's environment, so it is handed the model instead of reading it.
+/// The context menu for items, in every view mode: an icon row (Cut, Copy, Rename, Delete), then the list.
+/// The entries come from `ContextMenuPlan`. A menu is built outside the view's environment, so it is handed the model.
 struct ItemMenu: View {
     let model: AppModel
     let urls: Set<URL>
 
     var body: some View {
         if !urls.isEmpty {
-            Button("Open") { model.tab.open(Array(urls)) }
-            TagMenu(model: model, urls: Array(urls))
-            if urls.count == 1 {
-                Button("Rename") { model.actions.beginRename() }
-                if let folder = model.tab.items.first(where: { urls.contains($0.url) && $0.isFolder }) {
-                    Button("Open in New Tab") { model.newTab(at: folder.url) }
-                    Button("Open in Terminal") { model.openInTerminal(folder.url) }
-                    if model.places.isPinned(folder.url) {
-                        Button("Unpin from Quick access") { model.places.unpin(folder.url) }
-                    } else {
-                        Button("Pin to Quick access") { model.places.pin(folder.url) }
-                    }
+            let chosen = model.tab.items.filter { urls.contains($0.url) }
+            let plan = ContextMenuPlan(selectionCount: urls.count, hasFolder: chosen.contains(where: \.isFolder),
+                                       isOnlyFolder: chosen.count == 1 && chosen[0].isFolder, onServer: model.tab.isRemote,
+                                       isPinned: chosen.first.map { model.places.isPinned($0.url) } ?? false)
+            ControlGroup {
+                ForEach(plan.iconRow, id: \.self) { entry in
+                    Button(Self.title(entry), systemImage: Self.symbol(entry)) { Self.run(entry, urls: urls, model: model) }
+                        .labelStyle(.iconOnly)
+                        .help(Self.title(entry))
                 }
             }
+            ForEach(plan.items, id: \.self) { entry in
+                switch entry {
+                case .tags: TagMenu(model: model, urls: Array(urls))
+                case .openWith: OpenWithMenu(urls: Array(urls))
+                default: Button(Self.title(entry)) { Self.run(entry, urls: urls, model: model) }
+                }
+            }
+        }
+    }
+
+    /// Menu actions work on what was right-clicked, which may not be what was selected.
+    static func run(_ entry: ContextMenuPlan.Entry, urls: Set<URL>, model: AppModel) {
+        if model.tab.selection != urls { model.tab.selection = urls }
+        let folder = model.tab.items.first { urls.contains($0.url) && $0.isFolder }
+        switch entry {
+        case .cut: model.actions.cutSelection()
+        case .copy: model.actions.copySelection()
+        case .rename: model.actions.beginRename()
+        case .delete: model.actions.trashSelection()
+        case .open: model.tab.open(Array(urls))
+        case .properties: model.showProperties()
+        case .openInNewTab: if let folder { model.newTab(at: folder.url) }
+        case .openInTerminal: if let folder { model.openInTerminal(folder.url) }
+        case .pin: if let folder { model.places.pin(folder.url) }
+        case .unpin: if let folder { model.places.unpin(folder.url) }
+        case .openWith, .tags: break
+        }
+    }
+
+    static func title(_ entry: ContextMenuPlan.Entry) -> String {
+        switch entry {
+        case .cut: "Cut"
+        case .copy: "Copy"
+        case .rename: "Rename"
+        case .delete: "Delete"
+        case .open: "Open"
+        case .openWith: "Open With"
+        case .properties: "Properties"
+        case .tags: "Tags"
+        case .openInNewTab: "Open in New Tab"
+        case .openInTerminal: "Open in Terminal"
+        case .pin: "Pin to Quick access"
+        case .unpin: "Unpin from Quick access"
+        }
+    }
+
+    static func symbol(_ entry: ContextMenuPlan.Entry) -> String {
+        switch entry {
+        case .cut: "scissors"
+        case .copy: "doc.on.doc"
+        case .rename: "pencil"
+        case .delete: "trash"
+        default: "circle"
+        }
+    }
+}
+
+/// Open With: the apps that can open the file, by name. The first one is the default.
+struct OpenWithMenu: View {
+    let urls: [URL]
+
+    var body: some View {
+        let apps = urls.first.map { NSWorkspace.shared.urlsForApplications(toOpen: $0) } ?? []
+        Menu("Open With") {
+            ForEach(apps.prefix(12), id: \.self) { app in
+                Button(FileManager.default.displayName(atPath: app.path).replacingOccurrences(of: ".app", with: "")) {
+                    NSWorkspace.shared.open(urls, withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+                }
+            }
+            if apps.isEmpty { Text("No apps found") }
         }
     }
 }

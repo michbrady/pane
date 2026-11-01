@@ -103,3 +103,9 @@ Symptom: three Delete checks failed twice in a row, only after the connect flow 
 Cause: they follow a cancelled rename. A rename field that was just cancelled can still hold focus, and Delete steps aside for a focused text field. A small timing change was enough to expose it.
 Fix: the check lets the window settle, then clears the first responder before it looks.
 Rule: before a check that depends on focus, clear focus. This is the second time (see "Rename lights up").
+
+## One self-test run stopped for ten minutes and passed on the next two (M7)
+Symptom: a run sat inside the Remote section until the command timed out. A sample showed the main thread waiting at one `settle()`. The next two runs passed, 302 and 310 checks.
+Cause: not found. `settle` has an 8 second limit, so it was not that wait alone. Not reproduced.
+Fix: none yet. If it comes back, sample the process before killing it and check for an open sheet or alert, which stops a quit.
+Rule: do not call a flake fixed when it was never seen again. Write down what was seen and keep the sample.

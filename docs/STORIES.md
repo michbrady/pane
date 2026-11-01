@@ -569,7 +569,8 @@ Depends: S-041
 Acceptance:
 - [snap] The menu has the icon row on top and Open, Open With, Properties, Tags, Services below.
 - [self] Services from other apps appear.
-Status: todo
+Note: The right-click menu comes from one plan (`ContextMenuPlan`, unit-tested): an icon row (Cut, Copy, Rename for one item, Delete) and below it Open, Open With (apps for a local file), Properties, Tags, then Open in New Tab, Open in Terminal, and Pin for one folder. A server's items offer only the entries that work there (no Open With, Properties, Tags, Terminal, or Pin). Menu actions work on what was right-clicked, even if it was not selected. Delete on a server asks first. Same menu in Details, List, and Icons. NOT VERIFIED: a menu is its own window that a snapshot does not capture, so the icon row's look (SwiftUI `ControlGroup` in a context menu) and whether the system adds Services at the bottom need a right-click by a person [manual]. If Services do not appear, Pane needs an AppKit menu for that part.
+Status: done
 
 ### S-051 Show empty states
 As the user, I see a clear message in an empty folder or an empty search.

@@ -97,3 +97,16 @@ private func makeTree() throws -> URL {
     let cloud = FolderItem(url: URL(fileURLWithPath: "/a/n.txt"), name: "n.txt", isFolder: false, size: 5, modified: nil, kind: "Text", isOnlineOnly: true)
     #expect(ItemSpeech.label(for: cloud).hasSuffix("Online only"))
 }
+
+@Test func theContextMenuHasAnIconRowThenTheList() {
+    let file = ContextMenuPlan(selectionCount: 1, hasFolder: false, isOnlyFolder: false, onServer: false, isPinned: false)
+    #expect(file.iconRow == [.cut, .copy, .rename, .delete])
+    #expect(file.items == [.open, .openWith, .properties, .tags])
+    let folder = ContextMenuPlan(selectionCount: 1, hasFolder: true, isOnlyFolder: true, onServer: false, isPinned: false)
+    #expect(folder.items == [.open, .properties, .tags, .openInNewTab, .openInTerminal, .pin])
+    #expect(ContextMenuPlan(selectionCount: 1, hasFolder: true, isOnlyFolder: true, onServer: false, isPinned: true).items.last == .unpin)
+    let many = ContextMenuPlan(selectionCount: 3, hasFolder: false, isOnlyFolder: false, onServer: false, isPinned: false)
+    #expect(many.iconRow == [.cut, .copy, .delete], "Rename is for one item")
+    let remote = ContextMenuPlan(selectionCount: 1, hasFolder: true, isOnlyFolder: true, onServer: true, isPinned: false)
+    #expect(remote.items == [.open, .openInNewTab], "a server offers no Terminal, pins, Open With, Properties, or Tags")
+}

@@ -62,5 +62,34 @@ extension SelfTest {
         model.cancelEditingAddress()
         let first = model.tab.items.first
         check("a row's VoiceOver label has its name, kind, and size", first.map { ItemSpeech.label(for: $0, showExtensions: true).hasPrefix($0.name) } ?? false)
+
+        // S-050 Use context menus: the icon row and the list come from one plan, and each entry runs its action
+        model.tab.go(to: c.docs)
+        await settle()
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        let note = model.tab.items.first { $0.name == "Notes.txt" }!
+        let plan = ContextMenuPlan(selectionCount: 1, hasFolder: false, isOnlyFolder: false, onServer: false, isPinned: false)
+        check("the menu for a file has the icon row Cut, Copy, Rename, Delete, then Open, Open With, Properties, Tags",
+              plan.iconRow.map(ItemMenu.title) == ["Cut", "Copy", "Rename", "Delete"] && plan.items.map(ItemMenu.title) == ["Open", "Open With", "Properties", "Tags"])
+        check("every entry has a title and the icon row has icons", ContextMenuPlan.Entry.allCases.allSatisfy { !ItemMenu.title($0).isEmpty } && plan.iconRow.allSatisfy { ItemMenu.symbol($0) != "circle" })
+        ItemMenu.run(.copy, urls: [note.url], model: model)
+        check("Copy in the menu copies what was right-clicked, even if it was not selected", model.tab.selection == [note.url] && model.actions.canPaste)
+        ItemMenu.run(.cut, urls: [note.url], model: model)
+        check("Cut marks it as cut", model.actions.isCut(note.url))
+        model.actions.clearCut()
+        ItemMenu.run(.rename, urls: [note.url], model: model)
+        check("Rename starts renaming it", model.actions.renamingURL == note.url)
+        model.actions.cancelRename()
+        ItemMenu.run(.properties, urls: [note.url], model: model)
+        check("Properties opens its sheet", model.propertiesURLs == [note.url])
+        model.closeProperties()
+        ItemMenu.run(.delete, urls: [note.url], model: model)
+        await Wait.until { !model.actions.isBusy }
+        await settle()
+        check("Delete in the menu sends it to the Trash", !FileManager.default.fileExists(atPath: note.url.path))
+        model.actions.undoManager.undo()
+        await Wait.until { !model.actions.isBusy }
+        await settle()
+        check("and Undo brings it back", FileManager.default.fileExists(atPath: note.url.path))
     }
 }
