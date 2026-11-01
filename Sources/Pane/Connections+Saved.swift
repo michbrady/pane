@@ -38,6 +38,12 @@ extension Connections {
         showConnectSheet = true
     }
 
+    /// A click on a saved server's row, by its address.
+    func openSaved(serverKey: String) {
+        guard let connection = saved.connection(forServerKey: serverKey) else { return }
+        openSaved(connection)
+    }
+
     /// A click on a saved server that is not connected: connect with the saved settings and the Keychain's secret.
     /// A failure is said once, with the server's name. A server not seen before opens the sheet to ask about trusting it.
     func openSaved(_ connection: SavedConnection) {

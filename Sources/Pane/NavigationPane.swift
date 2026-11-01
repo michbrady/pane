@@ -38,7 +38,7 @@ struct NavigationPane: View {
             guard let id, let url = Places.url(forNavID: id), url != model.tab.currentFolder else { return }
             // A saved server that is not connected: connect to it, and stay where we are until it is.
             if RemoteURL.isRemote(url), model.router.remote(for: url) == nil {
-                model.openSavedConnection(serverKey: RemoteURL.serverKey(url))
+                model.connections.openSaved(serverKey: RemoteURL.serverKey(url))
                 model.places.syncTree()
                 return
             }

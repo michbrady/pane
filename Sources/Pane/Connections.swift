@@ -8,6 +8,10 @@ import PaneKit
 final class Connections {
     var showConnectSheet = false
 
+    /// The open connections to servers, and this Mac. Every tab reads it to pick a file system for a URL.
+    let router = FileSystemRouter(local: LocalFileSystem(
+        trashFolder: Locations.isOverridden ? Locations.home.appending(path: ".Trash", directoryHint: .isDirectory) : nil))
+
     /// What the sheet connects to. More join as they are built.
     enum Kind: String, CaseIterable, Identifiable {
         case share = "File Share (SMB)", ftp = "FTP", sftp = "SFTP", s3 = "Amazon S3"

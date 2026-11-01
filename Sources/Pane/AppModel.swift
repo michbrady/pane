@@ -44,9 +44,8 @@ final class AppModel {
     private(set) var propertiesURLs: [URL]?
 
     let places = Places()
-    /// The open connections to servers, shared by every tab.
-    let router = FileSystemRouter(local: LocalFileSystem(
-        trashFolder: Locations.isOverridden ? Locations.home.appending(path: ".Trash", directoryHint: .isDirectory) : nil))
+    /// The open connections to servers, shared by every tab. `Connections` owns them.
+    var router: FileSystemRouter { connections.router }
 
     // Address bar
     var isEditingAddress = false
@@ -194,12 +193,6 @@ final class AppModel {
         guard let saved = connections.saved.items.first(where: { $0.id == id }) else { return }
         if router.serverKeys.contains(saved.serverKey) { disconnect(serverKey: saved.serverKey) }
         connections.remove(id)
-    }
-
-    /// A click on a saved server that is not connected.
-    func openSavedConnection(serverKey: String) {
-        guard let saved = connections.saved.connection(forServerKey: serverKey) else { return }
-        connections.openSaved(saved)
     }
 
     /// A server is connected: file it in the router and show it under Connections.

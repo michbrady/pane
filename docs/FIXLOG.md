@@ -97,3 +97,9 @@ Symptom: the snapshot run never ended. A sample showed the main thread inside `N
 Cause: Quit now sends unsent saves first, so `applicationShouldTerminate` returns `.terminateLater` and replies from a main-actor task. Snapshot and self-test runs call `terminate` from a task that already holds the main actor, so the reply could never run.
 Fix: runs on the throwaway home (`Locations.isOverridden`) quit at once. A Quit from the menu still waits.
 Rule: anything that makes quitting asynchronous must be skipped by the test and snapshot runs, which quit from inside a task.
+
+## Delete on a server failed in the self-test after a refactor that did not touch it (M6 check-in)
+Symptom: three Delete checks failed twice in a row, only after the connect flow was rewritten.
+Cause: they follow a cancelled rename. A rename field that was just cancelled can still hold focus, and Delete steps aside for a focused text field. A small timing change was enough to expose it.
+Fix: the check lets the window settle, then clears the first responder before it looks.
+Rule: before a check that depends on focus, clear focus. This is the second time (see "Rename lights up").

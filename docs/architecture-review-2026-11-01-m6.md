@@ -74,3 +74,9 @@ Plan: skip unless a fourth provider is added.
 ## Top recommendation
 
 **Connecting to a server is one flow, not three** (Strong), in the four steps above, then **one test file per area** (Strong). Do both before M7: M7 (S-050 to S-054) does not touch connecting, so the cost of leaving it grows only when the next protocol or saved-connection field arrives, but each step here is small and keeps behavior the same.
+
+## Done (2026-11-01)
+
+- One test file per area: `FileOperationsTests`, `S3Tests`, `SFTPTests`, `FTPTests`, `TransferTests`, `ServerEditTests`, `SavedConnectionTests`, helpers in `TestSupport`. Same 116 tests before and after.
+- One connect flow: `SecretStore` (Keychain and in-memory adapters) replaced nine closures. `ConnectionForm` in PaneKit checks the fields, with two unit tests (118 tests). One `connect(form)` serves FTP, SFTP, and S3; every provider has `start()`. The five connect snapshots and 291 self-test checks are unchanged. `Connections` went from 287 to 220 lines.
+- `Connections` now owns the router and the saved-server opener. `connected`, `disconnect`, and `removeSavedConnection` stay in `AppModel` on purpose: they also move tabs and the tree, which `Connections` should not know about. `AppModel` is 364 lines (was 371).

@@ -408,21 +408,21 @@ extension SelfTest {
         await settle()
         check("a saved server stays in the list, dimmed, when it is not connected",
               model.places.connectionRoots.first { $0.savedID == minio?.id }?.isOffline == true && !model.router.serverKeys.contains("s3://minio.local:9000"))
-        model.openSavedConnection(serverKey: "s3://minio.local:9000")
+        model.connections.openSaved(serverKey: "s3://minio.local:9000")
         await Wait.until { model.router.serverKeys.contains("s3://minio.local:9000") }
         await settle()
         check("clicking it connects with the saved settings and the Keychain's secret, and shows it",
               model.router.serverKeys.contains("s3://minio.local:9000") && model.tab.isRemote && model.places.connectionRoots.first { $0.savedID == minio?.id }?.isOffline == false)
 
         model.connections.record(SavedConnection(kind: .s3, host: "down.local", user: "GOODKEY", region: "us-east-1"), replacing: nil)
-        model.openSavedConnection(serverKey: "s3://down.local")
+        model.connections.openSaved(serverKey: "s3://down.local")
         await Wait.until { model.connections.unableToConnect != nil }
         check("a saved server that is offline says Unable to connect, and stays dimmed",
               model.connections.unableToConnect?.name == "down.local (S3)" && model.connections.unableToConnect?.reason == "Unable to reach the server."
               && model.places.connectionRoots.first { $0.name == "down.local (S3)" }?.isOffline == true, "\(String(describing: model.connections.unableToConnect))")
         model.connections.unableToConnect = nil
         model.connections.record(SavedConnection(kind: .sftp, host: "nopass.local", user: "me"), replacing: nil)
-        model.openSavedConnection(serverKey: "sftp://nopass.local")
+        model.connections.openSaved(serverKey: "sftp://nopass.local")
         await Wait.until { model.connections.unableToConnect != nil }
         check("a saved server with no password in the Keychain says so", model.connections.unableToConnect?.reason == "Type the password.", "\(String(describing: model.connections.unableToConnect))")
         model.connections.unableToConnect = nil
